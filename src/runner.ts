@@ -65,13 +65,19 @@ export function toPlaywright(page: Page, l: Locator): PwLocator {
   return nth === undefined ? loc : loc.nth(nth);
 }
 
-function absoluteUrl(baseUrl: string | null, target: string): string {
-  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
-    if (!/^https?:\/\//i.test(target)) throw new Error(`"goto": "${target}" is refused: only http and https URLs can be opened`);
-    return target;
+/** Resolves a recipe `goto` target against the base URL; refuses anything that is not http or https. */
+export function absoluteUrl(baseUrl: string | null, target: string): string {
+  if (/[\s\u0000-\u001f]/.test(target)) throw new Error(`"goto": ${JSON.stringify(target)} is refused: it contains whitespace or control characters`);
+  let url: URL;
+  try {
+    url = baseUrl ? new URL(target, baseUrl) : new URL(target);
+  } catch {
+    throw new Error(`"goto": "${target}" is relative but config.json has no baseUrl`);
   }
-  if (!baseUrl) throw new Error(`"goto": "${target}" is relative but config.json has no baseUrl`);
-  return new URL(target, baseUrl).toString();
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`"goto": "${target}" is refused: only http and https URLs can be opened`);
+  }
+  return url.toString();
 }
 
 async function settle(page: Page): Promise<void> {
@@ -89,28 +95,42 @@ function tidyText(text: string): string {
 }
 
 /**
- * Resolves `${VAR}` in a recipe value. A value that reads the environment is only typed into a page
- * on the app's own origin, so a recipe cannot send a secret to another site.
+ * Types or selects a recipe value into the element a locator resolves to. A value that reads the
+ * environment (`${VAR}`) is only entered when both the page and the frame that owns the element are
+ * on the app's own origin, so a recipe cannot send a secret to another site or to an embedded frame.
+ * The check and the action use the same element handle, which a navigation in between invalidates.
  */
-function recipeValue(page: Page, value: string, opts: RunOptions): string {
-  if (!value.includes('${')) return value;
-  const appOrigin = opts.baseUrl ? new URL(opts.baseUrl).origin : null;
-  const pageOrigin = new URL(page.url()).origin;
-  if (!appOrigin || pageOrigin !== appOrigin) {
-    throw new Error(`a value using an environment variable can only be typed on the app's own origin (${appOrigin ?? 'config.json has no baseUrl'}), but the page is ${pageOrigin}`);
+async function enterValue(page: Page, locator: Locator, value: string, opts: RunOptions, timeout: number, action: 'fill' | 'select'): Promise<void> {
+  const target = toPlaywright(page, locator);
+  if (!value.includes('${')) {
+    if (action === 'fill') await target.fill(value, { timeout });
+    else await target.selectOption(value, { timeout });
+    return;
   }
-  return substituteEnv(value);
+  const appOrigin = opts.baseUrl ? new URL(opts.baseUrl).origin : null;
+  if (!appOrigin) throw new Error('a value using an environment variable needs config.json baseUrl, so it is only typed on the app itself');
+  const handle = await target.elementHandle({ timeout });
+  if (!handle) throw new Error('the element to type into was not found');
+  const frame = await handle.ownerFrame();
+  const origins = [page.url(), frame ? frame.url() : 'about:blank'].map((u) => new URL(u).origin);
+  const foreign = origins.find((o) => o !== appOrigin);
+  if (foreign) {
+    throw new Error(`a value using an environment variable can only be typed on the app's own origin (${appOrigin}), but the target is on ${foreign}`);
+  }
+  const resolved = substituteEnv(value);
+  if (action === 'fill') await handle.fill(resolved, { timeout });
+  else await handle.selectOption(resolved, { timeout });
 }
 
 async function runStep(page: Page, step: Step, opts: RunOptions, timeout: number): Promise<void> {
   if ('goto' in step) {
     await page.goto(absoluteUrl(opts.baseUrl, step.goto), { waitUntil: 'load', timeout: Math.max(timeout, 30_000) });
   } else if ('click' in step) await toPlaywright(page, step.click).click({ timeout });
-  else if ('fill' in step) await toPlaywright(page, step.fill).fill(recipeValue(page, step.value, opts), { timeout });
+  else if ('fill' in step) await enterValue(page, step.fill, step.value, opts, timeout, 'fill');
   else if ('press' in step) {
     if (step.on) await toPlaywright(page, step.on).press(step.press, { timeout });
     else await page.keyboard.press(step.press);
-  } else if ('select' in step) await toPlaywright(page, step.select).selectOption(recipeValue(page, step.value, opts), { timeout });
+  } else if ('select' in step) await enterValue(page, step.select, step.value, opts, timeout, 'select');
   else if ('hover' in step) await toPlaywright(page, step.hover).hover({ timeout });
   else if ('waitFor' in step) {
     const t = step.timeout ?? Math.max(timeout, 15_000);
