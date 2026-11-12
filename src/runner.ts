@@ -66,7 +66,10 @@ export function toPlaywright(page: Page, l: Locator): PwLocator {
 }
 
 function absoluteUrl(baseUrl: string | null, target: string): string {
-  if (/^[a-z]+:\/\//i.test(target)) return target;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
+    if (!/^https?:\/\//i.test(target)) throw new Error(`"goto": "${target}" is refused: only http and https URLs can be opened`);
+    return target;
+  }
   if (!baseUrl) throw new Error(`"goto": "${target}" is relative but config.json has no baseUrl`);
   return new URL(target, baseUrl).toString();
 }
@@ -85,15 +88,29 @@ function tidyText(text: string): string {
     .trim();
 }
 
+/**
+ * Resolves `${VAR}` in a recipe value. A value that reads the environment is only typed into a page
+ * on the app's own origin, so a recipe cannot send a secret to another site.
+ */
+function recipeValue(page: Page, value: string, opts: RunOptions): string {
+  if (!value.includes('${')) return value;
+  const appOrigin = opts.baseUrl ? new URL(opts.baseUrl).origin : null;
+  const pageOrigin = new URL(page.url()).origin;
+  if (!appOrigin || pageOrigin !== appOrigin) {
+    throw new Error(`a value using an environment variable can only be typed on the app's own origin (${appOrigin ?? 'config.json has no baseUrl'}), but the page is ${pageOrigin}`);
+  }
+  return substituteEnv(value);
+}
+
 async function runStep(page: Page, step: Step, opts: RunOptions, timeout: number): Promise<void> {
   if ('goto' in step) {
     await page.goto(absoluteUrl(opts.baseUrl, step.goto), { waitUntil: 'load', timeout: Math.max(timeout, 30_000) });
   } else if ('click' in step) await toPlaywright(page, step.click).click({ timeout });
-  else if ('fill' in step) await toPlaywright(page, step.fill).fill(substituteEnv(step.value), { timeout });
+  else if ('fill' in step) await toPlaywright(page, step.fill).fill(recipeValue(page, step.value, opts), { timeout });
   else if ('press' in step) {
     if (step.on) await toPlaywright(page, step.on).press(step.press, { timeout });
     else await page.keyboard.press(step.press);
-  } else if ('select' in step) await toPlaywright(page, step.select).selectOption(substituteEnv(step.value), { timeout });
+  } else if ('select' in step) await toPlaywright(page, step.select).selectOption(recipeValue(page, step.value, opts), { timeout });
   else if ('hover' in step) await toPlaywright(page, step.hover).hover({ timeout });
   else if ('waitFor' in step) {
     const t = step.timeout ?? Math.max(timeout, 15_000);
