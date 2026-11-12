@@ -1,0 +1,44 @@
+{
+  "name": "screenify",
+  "version": "0.1.0",
+  "description": "An organised, searchable screenshot library of your app for coding agents: screens, flow boards, sidecars and staleness tracking.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "screenify": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "skill",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "screenshots",
+    "playwright",
+    "agents",
+    "claude-code",
+    "codex",
+    "documentation"
+  ],
+  "dependencies": {
+    "playwright-core": "^1.65.0",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
