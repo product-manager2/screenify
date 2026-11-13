@@ -34,8 +34,13 @@ describe('paths', () => {
   });
   it('resolves viewports', () => {
     expect(resolveViewport('desktop')).toMatchObject({ width: 1440, height: 900, isMobile: false });
-    expect(resolveViewport({ name: 'Pixel', width: 412, height: 915 })).toMatchObject({ name: 'pixel', isMobile: true, deviceScaleFactor: 2 });
+    expect(resolveViewport({ name: 'Pixel', width: 412, height: 915 })).toMatchObject({ name: 'pixel', isMobile: true, deviceScaleFactor: 1 });
+    expect(resolveViewport('mobile')).toMatchObject({ deviceScaleFactor: 1, isMobile: true });
     expect(resolveViewport('iphone-393x852')).toMatchObject({ name: 'iphone', width: 393, height: 852 });
     expect(() => resolveViewport('huge')).toThrow(/Unknown viewport/);
+  });
+  it('captures every preset at 1x and names any other scale', () => {
+    expect(viewportLabel(resolveViewport('desktop'))).toBe('desktop-1440x900');
+    expect(viewportLabel(resolveViewport({ name: 'mobile', width: 390, height: 844, deviceScaleFactor: 2 }))).toBe('mobile-390x844-2x');
   });
 });

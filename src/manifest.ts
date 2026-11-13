@@ -8,6 +8,8 @@ export interface FlowFrame {
   /** Store-relative path of the full-resolution frame. */
   path: string;
   url?: string;
+  /** The agent's one line on what the frame shows. */
+  shows?: string;
 }
 
 /** One entry in the library: a screen state or a flow. */
@@ -47,6 +49,12 @@ export interface Capture {
   capturedAt: string;
   /** Plan item this capture fulfils. */
   planItem?: string;
+  /** The agent's one line on what the image shows (a flow: its last frame, the result). */
+  shows?: string;
+  /** SHA-256 of the image's pixels as filed (screens), used to catch two states that are the same image. */
+  hash?: string;
+  /** Commit the running app reported at `config.versionUrl` when captured; absent when none is configured. */
+  servedCommit?: string | null;
 }
 
 /** `manifest.json`: every capture keyed by id. */

@@ -1,4 +1,6 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { createServer } from 'node:net';
+import { reachable } from '../src/app.js';
 import { cpSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -46,4 +48,23 @@ export function writeFile(path: string, content: string): void {
 export function commitAll(repo: string, message = 'change'): void {
   sh(repo, 'git', ['add', '-A']);
   sh(repo, 'git', ['commit', '-q', '-m', message]);
+}
+
+/** A free local TCP port. */
+export function freePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const s = createServer();
+    s.listen(0, '127.0.0.1', () => {
+      const port = (s.address() as { port: number }).port;
+      s.close(() => resolve(port));
+    });
+  });
+}
+
+/** Starts the Taskly fixture server from `repo` on a free port and waits until it answers. */
+export async function startFixture(repo: string, env: Record<string, string> = {}): Promise<{ port: number; server: ChildProcess }> {
+  const port = await freePort();
+  const server = spawn(process.execPath, ['server.mjs'], { cwd: repo, env: { ...process.env, ...env, PORT: String(port) }, stdio: 'ignore' });
+  for (let i = 0; i < 100 && !(await reachable(`http://127.0.0.1:${port}/`)); i++) await new Promise((r) => setTimeout(r, 100));
+  return { port, server };
 }

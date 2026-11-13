@@ -46,6 +46,32 @@ describe('store resolution', () => {
     expect(existsSync(join(store.link, 'keep.txt'))).toBe(true);
   });
 
+  it('resolves the real store from inside screenify-out and never creates a nested one', () => {
+    const repo = tempRepo();
+    const { store } = openStore(repo);
+    mkdirSync(join(store.dir, 'recipes', 'web'), { recursive: true });
+    const inside = join(repo, 'screenify-out', 'recipes', 'web');
+    // Through the link's logical path, as a shell or an agent passes it.
+    expect(resolveStore(inside, {}).dir).toBe(store.dir);
+    expect(openStore(inside, {}).store.repoRoot).toBe(repo);
+    // A process only sees the store's real path; the shell's PWD still names the checkout.
+    const physical = join(store.dir, 'recipes', 'web');
+    expect(resolveStore(physical, { PWD: inside }).dir).toBe(store.dir);
+    // Without PWD there is no way to know the checkout: refuse rather than guess or nest.
+    expect(() => resolveStore(physical, {})).toThrow(/inside the Screenify store/);
+    expect(existsSync(join(store.dir, 'screenify-out'))).toBe(false);
+    expect(existsSync(join(store.dir, 'recipes', 'web', 'screenify-out'))).toBe(false);
+  });
+
+  it('resolves the local folder from inside it outside git', () => {
+    const dir = tempDir();
+    openStore(dir);
+    mkdirSync(join(dir, 'screenify-out', 'recipes'));
+    const s = openStore(join(dir, 'screenify-out', 'recipes'), {}).store;
+    expect(s.dir).toBe(join(dir, 'screenify-out'));
+    expect(existsSync(join(dir, 'screenify-out', 'recipes', 'screenify-out'))).toBe(false);
+  });
+
   it('uses a plain local folder outside git', () => {
     const dir = tempDir();
     const s = resolveStore(dir);

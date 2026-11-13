@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { emptyPlan, importPlan, parsePlanImport, parsePlanItem, removePlanItem, upsertPlanItem } from '../src/plan.js';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Capture, Manifest } from '../src/manifest.js';
+import { emptyPlan, importPlan, markDone, missingSources, parsePlanImport, parsePlanItem, removePlanItem, settleItemStatus, stateCoverage, upsertPlanItem } from '../src/plan.js';
+import { tempDir } from './helpers.js';
 
 const list = { kind: 'screen', feature: 'Tasks', name: 'Task list', route: '/tasks', example: '/tasks', states: [{ name: 'Empty', how: 'Start with SEED_TASKS empty' }], sources: ['./pages/tasks.mjs'] };
 const create = { kind: 'flow', feature: 'tasks', name: 'create-task', start: 'task-list', steps: ['Open the list', 'Click New task', 'Save'], writes: true, sources: ['components/new-task-dialog.mjs'] };
@@ -79,5 +83,57 @@ describe('plan import', () => {
     const { item } = parsePlanItem({ ...list, note: 'needs login' }, 'plan add');
     expect(upsertPlanItem(plan, item!)).toBe(false);
     expect(plan.items[0]).toMatchObject({ status: 'skipped', note: 'needs login' });
+  });
+});
+
+const screenCapture = (item: string, state: string): Capture => ({
+  id: `screens/web/tasks/task-list/task-list--${state}--desktop-1440x900--app-default`, kind: 'screen', platform: 'web', feature: 'tasks', name: 'task-list',
+  state, viewport: 'desktop-1440x900', theme: 'app-default', image: 'x.png', sidecar: 'x.md', sources: [], commit: null, branch: null, dirty: false, capturedAt: '', planItem: item,
+});
+
+describe('plan item fields and per-state coverage', () => {
+  const twoStates = { ...list, states: [{ name: 'filled', how: 'Seed three tasks' }, { name: 'empty', how: 'No tasks' }] };
+
+  it('parses auth and requires, and rejects a bad requires', () => {
+    const [item] = parsePlanImport([{ ...list, auth: 'member', requires: ['alpha build channel'] }]);
+    expect(item).toMatchObject({ auth: 'member', requires: ['alpha build channel'], skippedStates: {} });
+    expect(parsePlanImport([list])[0].requires).toEqual([]);
+    expect(() => parsePlanImport([{ ...list, requires: 'alpha' }])).toThrow(/"requires" must list what capture needs first/);
+    expect(() => parsePlanImport([{ ...list, auth: 3 }])).toThrow(/"auth" must be a string/);
+  });
+
+  it('refuses plan done while states are uncaptured, and accepts skip-state with a note', () => {
+    const plan = emptyPlan();
+    importPlan(plan, parsePlanImport([twoStates]), null);
+    const manifest: Manifest = { version: 1, captures: {} };
+    const id = 'screen:web:tasks:task-list';
+    expect(() => markDone(plan, manifest, id, {})).toThrow('screen:web:tasks:task-list still has uncaptured states: filled, empty');
+
+    const c = screenCapture(id, 'filled');
+    manifest.captures[c.id] = c;
+    settleItemStatus(plan.items[0], manifest);
+    expect(plan.items[0].status).toBe('pending');
+    expect(stateCoverage(plan.items[0], manifest)).toEqual({ captured: ['filled'], skipped: [], missing: ['empty'], total: 2 });
+    expect(() => markDone(plan, manifest, id, {})).toThrow(/uncaptured states: empty\./);
+
+    expect(() => markDone(plan, manifest, id, { skipStates: ['empty'] })).toThrow(/needs --note/);
+    expect(() => markDone(plan, manifest, id, { skipStates: ['loading'], note: 'x' })).toThrow(/has no state loading; its states are filled, empty/);
+    const item = markDone(plan, manifest, id, { skipStates: ['Empty'], note: 'needs a fresh account' });
+    expect(item.skippedStates).toEqual({ empty: 'needs a fresh account' });
+    expect(item.status).toBe('captured');
+    expect(markDone(plan, manifest, id, {}).status).toBe('captured');
+
+    // Skipped states survive a re-import, like capture status.
+    importPlan(plan, parsePlanImport([twoStates]), null);
+    expect(plan.items[0].skippedStates).toEqual({ empty: 'needs a fresh account' });
+    expect(markDone(plan, manifest, id, { skip: true, note: 'gone' }).status).toBe('skipped');
+  });
+
+  it('reports source paths that do not exist in the checkout', () => {
+    const repo = tempDir();
+    mkdirSync(join(repo, 'pages'));
+    writeFileSync(join(repo, 'pages/tasks.mjs'), '');
+    const items = parsePlanImport([list, { ...home, sources: ['pages/home.mjs'] }]);
+    expect(missingSources(items, repo)).toEqual(['screen:web:home:home: pages/home.mjs']);
   });
 });

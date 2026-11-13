@@ -1,4 +1,7 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { readJson, writeJson } from './fsutil.js';
+import type { Manifest } from './manifest.js';
 import { slug } from './naming.js';
 import { storePaths, type Store } from './store.js';
 
@@ -36,9 +39,15 @@ export interface PlanItem {
   sources: string[];
   /** Anything the capture agent needs: seed data, feature flag, account role. */
   note?: string;
+  /** Account or role the item must be captured as (`member`, `admin`, `guest`). */
+  auth?: string;
+  /** Environment the item needs before capture: feature flags, build channel, seed data ("alpha channel"). */
+  requires: string[];
   status: 'pending' | 'captured' | 'skipped';
   /** Manifest capture ids produced for this item. */
   captures: string[];
+  /** States deliberately not captured, with the reason (`plan done --skip-state`). Kept across imports. */
+  skippedStates: Record<string, string>;
 }
 
 /** `plan.json`: the checklist the discovery agent wrote, with capture status per item. */
@@ -75,7 +84,9 @@ export function loadPlan(store: Store): Plan {
       steps: i.steps ?? [],
       writes: !!i.writes,
       sources: i.sources ?? [],
+      requires: i.requires ?? [],
       captures: i.captures ?? [],
+      skippedStates: i.skippedStates ?? {},
       status: i.status ?? 'pending',
     })),
   };
@@ -108,13 +119,16 @@ export function parsePlanItem(raw: any, where: string): { item?: PlanItem; error
   if (kind !== 'screen' && kind !== 'flow') errors.push(`${where}: "kind" must be "screen" or "flow"`);
   for (const k of ['feature', 'name']) if (!str(raw[k])) errors.push(`${where}: "${k}" must be a non-empty string`);
   if (raw.platform !== undefined && !str(raw.platform)) errors.push(`${where}: "platform" must be a string`);
-  for (const k of ['route', 'example', 'start', 'note']) {
+  for (const k of ['route', 'example', 'start', 'note', 'auth']) {
     if (raw[k] !== undefined && typeof raw[k] !== 'string') errors.push(`${where}: "${k}" must be a string`);
   }
   if (!Array.isArray(raw.sources) || !raw.sources.length || !raw.sources.every(str)) {
     errors.push(`${where}: "sources" must list the repo-relative files that shape it (at least one)`);
   } else if (raw.sources.some((s: string) => s.startsWith('/') || s.startsWith('..'))) {
     errors.push(`${where}: "sources" must be repo-relative paths`);
+  }
+  if (raw.requires !== undefined && !(Array.isArray(raw.requires) && raw.requires.every(str))) {
+    errors.push(`${where}: "requires" must list what capture needs first, e.g. ["alpha build channel", "a workspace with goals"]`);
   }
   const states: PlanState[] = [];
   if (kind === 'screen') {
@@ -149,8 +163,11 @@ export function parsePlanItem(raw: any, where: string): { item?: PlanItem; error
       writes: kind === 'flow' ? raw.writes : false,
       sources: [...new Set<string>(raw.sources.map((s: string) => s.trim().replace(/^\.\//, '')))].sort(),
       note: raw.note,
+      auth: raw.auth,
+      requires: (raw.requires ?? []).map((r: string) => r.trim()),
       status: 'pending',
       captures: [],
+      skippedStates: {},
     },
   };
 }
@@ -183,7 +200,12 @@ export interface ImportReport {
   vanished: string[];
 }
 
-const content = (i: PlanItem) => JSON.stringify({ ...i, status: undefined, captures: undefined });
+const content = (i: PlanItem) => JSON.stringify({ ...i, status: undefined, captures: undefined, skippedStates: undefined });
+
+/** Carries what capture recorded (status, captures, skipped states) from the stored item onto a re-imported one. */
+function keepCaptureState(item: PlanItem, prev: PlanItem | undefined): PlanItem {
+  return prev ? { ...item, status: prev.status, captures: prev.captures, skippedStates: prev.skippedStates } : item;
+}
 
 /**
  * Merges imported items into the plan by id: imported content wins, capture status and
@@ -197,7 +219,7 @@ export function importPlan(plan: Plan, items: PlanItem[], commit: string | null)
     if (!prev) report.added.push(item.id);
     else if (content(prev) === content(item)) report.unchanged.push(item.id);
     else report.updated.push(item.id);
-    byId.set(item.id, prev ? { ...item, status: prev.status, captures: prev.captures } : item);
+    byId.set(item.id, keepCaptureState(item, prev));
   }
   const imported = new Set(items.map((i) => i.id));
   report.vanished = plan.items.filter((i) => !imported.has(i.id)).map((i) => i.id).sort();
@@ -210,7 +232,7 @@ export function importPlan(plan: Plan, items: PlanItem[], commit: string | null)
 /** Adds or replaces one item, keeping capture status when it already existed. Returns whether it was new. */
 export function upsertPlanItem(plan: Plan, item: PlanItem): boolean {
   const prev = plan.items.find((i) => i.id === item.id);
-  const next = prev ? { ...item, status: prev.status, captures: prev.captures } : item;
+  const next = keepCaptureState(item, prev);
   plan.items = [...plan.items.filter((i) => i.id !== item.id), next].sort((a, b) => a.id.localeCompare(b.id));
   return !prev;
 }
@@ -219,5 +241,96 @@ export function upsertPlanItem(plan: Plan, item: PlanItem): boolean {
 export function removePlanItem(plan: Plan, ref: string): PlanItem | undefined {
   const item = findPlanItem(plan, ref);
   if (item) plan.items = plan.items.filter((i) => i.id !== item.id);
+  return item;
+}
+
+/**
+ * Repo-relative `sources` that do not exist in the checkout, as `"<item id>: <path>"`. An import
+ * with any is rejected: staleness would silently never fire for a path that is not there.
+ */
+export function missingSources(items: PlanItem[], repoRoot: string): string[] {
+  const out: string[] = [];
+  for (const i of items) for (const s of i.sources) if (!existsSync(join(repoRoot, s))) out.push(`${i.id}: ${s}`);
+  return out;
+}
+
+/** Which of a screen item's states have a capture, which are skipped, and which are still missing. */
+export interface StateCoverage {
+  captured: string[];
+  skipped: string[];
+  missing: string[];
+  total: number;
+}
+
+/** Compares a plan item's states with the states its captures in the manifest show. */
+export function stateCoverage(item: PlanItem, manifest: Manifest): StateCoverage {
+  const have = new Set(
+    Object.values(manifest.captures)
+      .filter((c) => c.planItem === item.id && c.kind === 'screen' && c.state)
+      .map((c) => c.state as string),
+  );
+  const names = item.states.map((s) => s.name);
+  return {
+    captured: names.filter((n) => have.has(n)),
+    skipped: names.filter((n) => !have.has(n) && item.skippedStates[n] !== undefined),
+    missing: names.filter((n) => !have.has(n) && item.skippedStates[n] === undefined),
+    total: names.length,
+  };
+}
+
+/**
+ * Sets an item's status from the manifest: a screen is `captured` once every state is captured or
+ * skipped (`skipped` when every state was skipped), else `pending`; a flow is `captured` once it has
+ * any capture. An item skipped as a whole stays skipped.
+ */
+export function settleItemStatus(item: PlanItem, manifest: Manifest): void {
+  if (item.status === 'skipped') return;
+  const any = Object.values(manifest.captures).some((c) => c.planItem === item.id);
+  if (item.kind === 'flow') {
+    item.status = any ? 'captured' : 'pending';
+    return;
+  }
+  const cov = stateCoverage(item, manifest);
+  item.status = cov.missing.length ? 'pending' : cov.captured.length ? 'captured' : 'skipped';
+}
+
+/** What `plan done` does to one item. */
+export interface DoneOptions {
+  /** Skip the whole item. */
+  skip?: boolean;
+  /** Skip these states of a screen. */
+  skipStates?: string[];
+  /** The reason; required with `skipStates`. */
+  note?: string;
+}
+
+/**
+ * Marks a plan item done: skipped (whole item, or listed states with a note), or captured. Refuses
+ * to mark an item captured while any of its states has neither a capture nor a skip reason.
+ */
+export function markDone(plan: Plan, manifest: Manifest, ref: string, opts: DoneOptions): PlanItem {
+  const item = findPlanItem(plan, ref);
+  if (!item) throw new Error(`no plan item "${ref}" (use the id from "screenify plan show")`);
+  if (opts.skipStates?.length) {
+    if (!opts.note) throw new Error('--skip-state needs --note saying why the state is not captured');
+    const known = new Set(item.states.map((s) => s.name));
+    const unknown = opts.skipStates.map((s) => slug(s)).filter((s) => !known.has(s));
+    if (unknown.length) throw new Error(`${item.id} has no state ${unknown.join(', ')}; its states are ${[...known].join(', ') || '(none)'}`);
+    for (const s of opts.skipStates) item.skippedStates[slug(s)] = opts.note;
+    settleItemStatus(item, manifest);
+    return item;
+  }
+  if (opts.note) item.note = opts.note;
+  if (opts.skip) {
+    item.status = 'skipped';
+    return item;
+  }
+  const missing = item.kind === 'screen' ? stateCoverage(item, manifest).missing : [];
+  if (missing.length) {
+    throw new Error(
+      `${item.id} still has uncaptured states: ${missing.join(', ')}. Capture them, skip each with --skip-state <state> --note "<why>", or skip the item with --skip.`,
+    );
+  }
+  item.status = 'captured';
   return item;
 }

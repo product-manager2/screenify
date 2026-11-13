@@ -41,7 +41,12 @@ plan with `screenify plan import`. Each item carries:
 - `sources`: only the files that shape that screen or flow, never the app shell or shared
   design-system files. Staleness checks exactly these, so editing one component marks only the
   screens that list it.
-- `note`: what capture needs (seed data, a feature flag, an account role).
+- `auth`: the account or role to capture as; `requires`: what the environment must provide first
+  (a feature flag, a build channel, seed data), so capture can prepare it and report "needs the
+  alpha channel" instead of filing a redirect.
+- `note`: anything else capture needs to know.
+
+`plan import` rejects a source path that does not exist in the checkout.
 
 `plan.json` records the commit it was discovered at; the next `screenify discover` lists the files
 changed since and the items that list them, so a refresh re-discovers only what changed.
@@ -95,7 +100,7 @@ is a plain folder.
 screenify-out/
   INDEX.md          start here: features, screens, flows, paths, capture commit, stale marks
   manifest.json     the same, machine-readable
-  config.json       baseUrl, start command, readyUrl, platforms, default branch, writesAllowed
+  config.json       baseUrl, start, readyUrl, readyTimeout, platforms, default branch, writesAllowed, hide, versionUrl
   plan.json         the agent's plan: items, their sources, capture status, discovery commit
   recipes/<platform>/<feature>/<name>.json
   screens/<platform>/<feature>/<screen>/<screen>--<state>--<viewport>--<theme>.png  (+ .md)
@@ -103,12 +108,19 @@ screenify-out/
   flows/<platform>/<feature>/<flow>--<viewport>--<theme>--frames/NN-<caption>.png  full-resolution frames
   boards/<title>.png                ad hoc sheets from `screenify board`
   .auth/                            saved logins (never listed in the index)
-  .failures/                        the page at the moment a recipe step failed
+  .failures/                        the page when a recipe failed (.png) and the error, final URL and alert text (.md)
 ```
 
 Each sidecar starts with YAML front matter (feature, screen, state, platform, viewport, theme,
-route, URL, source files, recipe, commit, branch, dirty flag, capture time) followed by the page's
-visible text and an accessibility outline. A flow sidecar lists the steps in order with each frame's path.
+`shows`, route, URL, source files, recipe, commit, branch, dirty flag, served commit, capture time)
+followed by the page's visible text and an accessibility outline. A flow sidecar lists the steps in
+order with each frame's path and `shows`. URLs have their query and fragment redacted.
+
+Viewports are named `<name>-<width>x<height>` (`desktop-1440x900`, `mobile-390x844`) and every preset
+is captured at device scale 1; an explicit viewport with another `deviceScaleFactor` adds it to the
+name (`mobile-390x844-2x`). Theme is `light` or `dark` only when the recipe forced it through the
+color-scheme media query; otherwise it is `app-default` (the browser then reports a fixed light
+preference whatever the host machine uses, so refreshes render alike everywhere).
 
 Boards are drawn no larger than 1568 px on the long edge (what vision models downsize to), so every
 frame stays legible: phone-shaped frames up to six in a row, desktop frames two per row and at most
@@ -125,22 +137,48 @@ replays it with `playwright-core`. Because recipes are stored, a refresh needs n
   "viewports": ["desktop", "mobile"], "writes": true, "auth": "login",
   "steps": [
     { "goto": "/tasks" },
-    { "shot": { "caption": "Task list" } },
+    { "waitFor": { "role": "heading", "name": "Tasks" } },
+    { "shot": { "caption": "Task list", "shows": "Task list with two seed tasks", "expectUrl": "/tasks" } },
     { "click": { "role": "button", "name": "New task" } },
-    { "shot": { "caption": "Click New task" } },
+    { "waitFor": { "role": "dialog" } },
+    { "shot": { "caption": "Click New task", "shows": "New task dialog open" } },
     { "fill": { "label": "Title" }, "value": "Buy milk" },
     { "click": { "role": "button", "name": "Save task" } },
     { "waitFor": { "text": "Buy milk" } },
-    { "shot": { "caption": "Task appears in the list" } }
+    { "shot": { "caption": "Task appears in the list", "shows": "Buy milk added", "expect": { "visible": "Buy milk" } } }
   ]
 }
 ```
 
 Steps: `goto`, `click`, `fill`, `press`, `select`, `hover`, `waitFor`, `wait`, `shot`. Locators:
-role and name, text, label, test id, or CSS. `fill` values support `${ENV_VAR}`. Kinds: `screen`
-(each shot is a state), `flow` (each shot is a numbered frame) and `auth` (logs in once and saves
-the session for recipes that say `"auth": "<name>"`). The full format is in
-[`skill/SKILL.md`](skill/SKILL.md).
+role and name, text, label, test id, or CSS. `fill` values and `goto` targets support `${ENV_VAR}`
+(a `goto` that reads the environment must stay on the app's origin). Kinds: `screen` (each shot is a
+state), `flow` (each shot is a numbered frame and needs a `caption`) and `auth` (signs in once and
+saves the session for recipes that say `"auth": "<name>"`). Every shot carries `shows`, the agent's
+one line on what the image shows. The full format is in
+[`skill/agents/screenify-capture.md`](skill/agents/screenify-capture.md).
+
+### What the CLI checks, and what it leaves to the agent
+
+The CLI does only deterministic work. Before filing a shot it checks:
+
+- **Landing URL.** The page must be on the shot's `expectUrl`, or for a screen, its plan item's
+  route (params as wildcards); otherwise the recipe fails with "expected /goals, ended on /tasks".
+- **Expected text.** `"expect": {"visible": [...], "absent": [...]}` against the page's visible text.
+- **Duplicates.** Two states with identical pixels, or an image identical to another capture, fail.
+- **Readiness is explicit.** A shot runs right after the recipe's preceding `waitFor` (and web fonts);
+  there is no network-idle guess, and `doctor` warns about shots without a `waitFor`.
+- **Sign-in.** A failed sign-in stops the batch once, naming the final URL and the page's alert text;
+  the remaining recipes are reported as not run, and sign-in is never retried per recipe.
+- **Served code.** With `versionUrl` set, each capture records the commit the app serves and the
+  index flags captures whose served commit differs from the checkout.
+
+Every image is captured with reduced motion, frozen animations and a hidden caret; `config.json`
+`hide` lists CSS selectors (dev overlays such as `nextjs-portal`) hidden in every shot, and a shot's
+`scrollContainer` expands an inner scrolling panel so a long screen is not cut at the viewport.
+Judgement stays with the agent: the capture agent prepares the environment (data, flags, theme),
+then opens every new image and its sidecar to confirm it shows the item and state it is named for,
+repairing or skipping any that does not.
 
 ## Commands
 
@@ -149,16 +187,19 @@ the session for recipes that say `"auth": "<name>"`). The full format is in
 | `init` | Store, link, `.gitignore`, skills, pointer lines |
 | `discover` | Prints the discovery agent's brief and, when a plan exists, the files changed since its commit and the items they touch |
 | `plan import <file\|->` | Merges the agent's plan JSON by id; capture status survives, items left out are reported |
-| `plan show` · `plan add` · `plan remove` · `plan done` | Read and edit the plan one item at a time |
-| `run <recipe…>` | Replays recipes and files the captures |
+| `plan show [--platform] [--feature] [--id] [--pending]` · `plan add` · `plan remove` | Read and edit the plan one item at a time |
+| `plan done <id>` | Marks an item captured; refused while a state has no capture. `--skip-state <state> --note` or `--skip --note` record why something is not captured |
+| `run <recipe…>` | Replays recipes, checks each shot and files the captures |
 | `add <png>` | Files an image captured elsewhere (Flutter, simulators, desktop apps) under the same rules |
 | `board <capture…> --title` | Composes chosen captures into one captioned sheet |
-| `status` | Captures whose source files changed since their commit, and plan items never captured |
+| `status` | Captures whose source files changed since their commit, and plan items with captured/total states |
 | `refresh [--all]` | Replays the recipes of stale captures; exits 1 listing failed recipes |
 | `index` | Rewrites `INDEX.md` |
-| `doctor` | Checks Node, store, config, app, browser and skills |
+| `doctor` | Checks Node, store, config, app (refused vs timeout), browser, skills, and recipes without a `waitFor` before a shot |
 
-`--json` is accepted wherever an agent would parse the output.
+`--json` is accepted wherever an agent would parse the output, and then stdout carries only JSON
+(notices such as a repaired link go to stderr). `screenify <command> --help` describes one command.
+Run commands from anywhere in the checkout, including inside `screenify-out`.
 
 ## How refresh works
 
@@ -166,8 +207,9 @@ Every capture records the commit it was taken at and links to its plan item. `sc
 diffs the plan item's `sources` (the files the discovery agent said shape that screen; a recipe may
 name its own instead) between that commit and the working tree, so a re-discovered source list
 applies to existing captures too. `screenify refresh` replays only the affected recipes. If the app is not
-answering at `baseUrl`, it runs `config.json`'s `start` command, waits for `readyUrl`, and stops
-the app afterwards. Captures taken off the default branch or from a dirty tree are flagged in the index.
+answering at `baseUrl`, it runs `config.json`'s `start` command, probes `readyUrl` with backoff for
+up to `readyTimeout` seconds, and stops the app afterwards. Without a `start` command it probes for
+`readyTimeout` seconds and then says whether the port refused (the app is down) or timed out (slow). Captures taken off the default branch or from a dirty tree are flagged in the index.
 
 Schedule it however you like. The skill offers a nightly or weekly run through your agent's
 scheduler: `screenify discover` lists changed files, the discovery agent updates only the items
@@ -181,7 +223,8 @@ and broken recipes. Plain cron, replaying recipes only, needs no model at all:
 ## Safety rules
 
 - **Headless only.** No visible browser window is ever opened.
-- **No secrets in recipes.** Use `${ENV_VAR}` in `fill` values; Screenify refuses to run when one is unset.
+- **No secrets in recipes.** Use `${ENV_VAR}` in `fill` values and `goto` targets; Screenify refuses to
+  run when one is unset, and redacts URL queries and fragments in output, failure logs and sidecars.
 - **Writes need a disposable database.** Recipes with `"writes": true` are skipped unless
   `config.json` has `"writesAllowed": true` (or `--allow-writes` is passed). The skill tells the
   agent to set that only after confirming the database is local or disposable.

@@ -1,4 +1,5 @@
 import type { Capture } from './manifest.js';
+import { redactText, redactUrl } from './runner.js';
 
 /** Quotes a scalar for YAML front matter when it needs quoting. */
 export function yamlScalar(v: unknown): string {
@@ -46,12 +47,14 @@ function commonFields(c: Capture): Record<string, unknown> {
     feature: c.feature,
     viewport: c.viewport,
     theme: c.theme,
+    shows: c.shows,
     route: c.route,
-    url: c.url,
+    url: c.url && redactUrl(c.url),
     recipe: c.recipe,
     commit: c.commit,
     branch: c.branch,
     dirty: c.dirty,
+    served_commit: c.servedCommit ?? undefined,
     captured_at: c.capturedAt,
     sources: c.sources,
   };
@@ -69,7 +72,8 @@ export function screenSidecar(c: Capture, page: { title?: string; text: string; 
   });
   const parts = [fm, '', `# ${c.feature} / ${c.name} — ${c.state} (${c.viewport}, ${c.theme})`, ''];
   parts.push('## Visible text', '', '```text', clip(page.text || '(no text)', MAX_TEXT), '```', '');
-  if (page.aria) parts.push('## Accessibility outline', '', '```yaml', clipLines(page.aria, MAX_ARIA_LINES), '```', '');
+  if (c.shows) parts.splice(4, 0, `Shows: ${c.shows}`, '');
+  if (page.aria) parts.push('## Accessibility outline', '', '```yaml', clipLines(redactText(page.aria), MAX_ARIA_LINES), '```', '');
   return parts.join('\n');
 }
 
@@ -87,7 +91,8 @@ export function flowSidecar(c: Capture, frameTexts: (string | undefined)[], desc
   parts.push('## Steps', '');
   (c.frames ?? []).forEach((f, i) => {
     parts.push(`${f.step}. ${f.caption}`, `   - frame: \`${f.path}\``);
-    if (f.url) parts.push(`   - url: ${f.url}`);
+    if (f.shows) parts.push(`   - shows: ${f.shows}`);
+    if (f.url) parts.push(`   - url: ${redactUrl(f.url)}`);
     const t = frameTexts[i];
     if (t) parts.push(`   - text: ${clip(t.replace(/\n+/g, ' · '), 300)}`);
   });

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readlinkSync, realpathSync, rmSync, symlinkSync, readdirSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { cacheRoot, OUT_DIR_NAME } from './env.js';
 import { gitInfo } from './git.js';
 
@@ -38,11 +38,43 @@ export function storeFolderName(commonDir: string): { name: string; repoName: st
   return { name: `${repoName}-${hash}`, repoName };
 }
 
-/** Resolves the store for the checkout containing `cwd` without touching the disk. */
-export function resolveStore(cwd: string): Store {
-  const info = gitInfo(cwd);
+function realOrSelf(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
+
+/** True when `child` is `parent` or inside it. */
+function within(child: string, parent: string): boolean {
+  return child === parent || child.startsWith(`${parent}${sep}`);
+}
+
+/**
+ * The checkout folder to resolve from. Inside `screenify-out` (the link, or the store it points at)
+ * the checkout is the folder that holds `screenify-out`, so a command run there never creates a
+ * nested store. The shell's logical `PWD` names it when the process only sees the store's real path.
+ */
+export function checkoutDir(cwd: string, env: NodeJS.ProcessEnv = process.env): string {
+  let logical = resolve(cwd);
+  const physical = realOrSelf(logical);
+  if (env.PWD && realOrSelf(env.PWD) === physical) logical = resolve(env.PWD);
+  const parts = logical.split(sep);
+  const at = parts.indexOf(OUT_DIR_NAME);
+  if (at > 0) return parts.slice(0, at).join(sep) || sep;
+  if (within(physical, realOrSelf(cacheRoot()))) {
+    throw new Error(`${physical} is inside the Screenify store; run screenify from the repository (or its screenify-out link), not from the store's real folder`);
+  }
+  return logical;
+}
+
+/** Resolves the store for the checkout containing `cwd` (or whose `screenify-out` contains it) without touching the disk. */
+export function resolveStore(cwd: string, env: NodeJS.ProcessEnv = process.env): Store {
+  const root = checkoutDir(cwd, env);
+  const info = gitInfo(root);
   if (!info) {
-    const repoRoot = resolve(cwd);
+    const repoRoot = resolve(root);
     const dir = join(repoRoot, OUT_DIR_NAME);
     return { dir, repoRoot, link: dir, shared: false, repoName: basename(repoRoot) };
   }
@@ -109,8 +141,8 @@ export function storePaths(store: Store) {
 }
 
 /** Resolves the store and heals the link: the first step of every CLI command. */
-export function openStore(cwd: string): { store: Store; changes: StoreChanges } {
-  const store = resolveStore(cwd);
+export function openStore(cwd: string, env: NodeJS.ProcessEnv = process.env): { store: Store; changes: StoreChanges } {
+  const store = resolveStore(cwd, env);
   const changes = ensureStore(store);
   return { store, changes };
 }

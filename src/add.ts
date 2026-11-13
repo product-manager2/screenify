@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { recordFlow, recordScreen, type FrameInput } from './capture.js';
+import { pixelHash, recordFlow, recordScreen, type FrameInput } from './capture.js';
 import { gitState } from './git.js';
 import { loadManifest, saveManifest } from './manifest.js';
 import { flowBase, slug } from './naming.js';
-import { loadPlan, planItemId, savePlan, type Plan } from './plan.js';
+import { loadPlan, planItemId, savePlan, settleItemStatus, type Plan } from './plan.js';
 import type { Store } from './store.js';
 import { writeIndex } from './indexfile.js';
 
@@ -26,6 +26,8 @@ export interface AddOptions {
   route?: string;
   /** Visible text to put in the sidecar, if the agent has it. */
   text?: string;
+  /** The agent's one line on what the image shows; required, as for recipe shots. */
+  shows: string;
 }
 
 /** `--source` files given to `add` override the plan item's; otherwise the plan item's apply. */
@@ -39,10 +41,12 @@ function sourcesFor(own: string[], plan: Plan, planId: string): { sources: strin
  * With `flow` and `step`, the image becomes that frame of the flow and the board is recomposed.
  */
 export async function addImage(store: Store, opts: AddOptions): Promise<string> {
+  if (!opts.shows?.trim()) throw new Error('--shows is required: one line saying what the image shows, e.g. "Task list with three tasks"');
   const png = await sharp(readFileSync(opts.png)).png().toBuffer();
   const meta = await sharp(png).metadata();
   const viewport = opts.viewport ? slug(opts.viewport) : `device-${meta.width}x${meta.height}`;
-  const theme = opts.theme ?? 'light';
+  // Only the agent knows the theme of an image captured with another tool; unstated means the app's default.
+  const theme = opts.theme ?? 'app-default';
   const manifest = loadManifest(store);
   const plan = loadPlan(store);
   const git = gitState(store.repoRoot);
@@ -52,8 +56,8 @@ export async function addImage(store: Store, opts: AddOptions): Promise<string> 
     if (!opts.caption) throw new Error('--caption is required with --flow');
     const key = { platform: opts.platform, feature: opts.feature, flow: opts.flow, viewport, theme };
     const existing = manifest.captures[flowBase(key)];
-    const frames: FrameInput[] = (existing?.frames ?? []).map((f) => ({ png: readFileSync(join(store.dir, f.path)), caption: f.caption, url: f.url }));
-    const frame = { png, caption: opts.caption, text: opts.text };
+    const frames: FrameInput[] = (existing?.frames ?? []).map((f) => ({ png: readFileSync(join(store.dir, f.path)), caption: f.caption, url: f.url, shows: f.shows }));
+    const frame = { png, caption: opts.caption, text: opts.text, shows: opts.shows };
     if (opts.step <= frames.length) frames[opts.step - 1] = frame;
     else if (opts.step === frames.length + 1) frames.push(frame);
     else throw new Error(`step ${opts.step} would leave a gap: the flow has ${frames.length} frame(s)`);
@@ -72,15 +76,15 @@ export async function addImage(store: Store, opts: AddOptions): Promise<string> 
       store,
       manifest,
       { platform: opts.platform, feature: opts.feature, screen: opts.screen, state: opts.state ?? 'default', viewport, theme },
-      { png, text: opts.text ?? '', aria: '' },
+      { png, text: opts.text ?? '', aria: '', shows: opts.shows, hash: await pixelHash(png) },
       { route: opts.route, ...sourcesFor(opts.sources ?? [], plan, planItemId('screen', opts.platform, opts.feature, opts.screen)), git, planItem: planItemId('screen', opts.platform, opts.feature, opts.screen) },
     );
     id = c.id;
   }
   const item = plan.items.find((i) => i.id === manifest.captures[id].planItem);
   if (item) {
-    item.status = 'captured';
     item.captures = [...new Set([...item.captures, id])].sort();
+    settleItemStatus(item, manifest);
     savePlan(store, plan);
   }
   saveManifest(store, manifest);

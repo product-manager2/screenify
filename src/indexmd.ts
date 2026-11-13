@@ -1,6 +1,7 @@
 import type { Config } from './config.js';
 import type { Capture, Manifest } from './manifest.js';
-import type { Plan } from './plan.js';
+import { stateCoverage, type Plan } from './plan.js';
+import { servedDiffers } from './git.js';
 import type { LibraryStatus } from './status.js';
 import type { Store } from './store.js';
 
@@ -9,7 +10,13 @@ function flags(c: Capture, staleIds: Set<string>, config: Config): string {
   if (staleIds.has(c.id)) f.push('STALE');
   if (c.dirty) f.push('dirty tree');
   if (config.defaultBranch && c.branch && c.branch !== config.defaultBranch) f.push(`branch ${c.branch}`);
+  if (servedDiffers(c.servedCommit, c.commit)) f.push(`served ${short(c.servedCommit ?? null)}`);
   return f.join(', ');
+}
+
+/** A table cell: pipes escaped so free text cannot break the row. */
+function cell(text: string | undefined): string {
+  return text ? text.replace(/\|/g, '\\|').replace(/\n/g, ' ') : '';
 }
 
 function short(commit: string | null): string {
@@ -47,18 +54,18 @@ export function renderIndex(store: Store, manifest: Manifest, plan: Plan, status
     out.push(`## ${key}`, '');
     const screens = list.filter((c) => c.kind === 'screen').sort((a, b) => a.id.localeCompare(b.id));
     if (screens.length) {
-      out.push('| Screen | State | Viewport | Theme | Image | Commit | Flags |', '| --- | --- | --- | --- | --- | --- | --- |');
+      out.push('| Screen | State | Shows | Viewport | Theme | Image | Commit | Flags |', '| --- | --- | --- | --- | --- | --- | --- | --- |');
       for (const c of screens) {
-        out.push(`| ${c.name} | ${c.state} | ${c.viewport} | ${c.theme} | \`${c.image}\` | ${short(c.commit)} | ${flags(c, staleIds, config)} |`);
+        out.push(`| ${c.name} | ${c.state} | ${cell(c.shows)} | ${c.viewport} | ${c.theme} | \`${c.image}\` | ${short(c.commit)} | ${flags(c, staleIds, config)} |`);
       }
       out.push('');
     }
     const flows = list.filter((c) => c.kind === 'flow').sort((a, b) => a.id.localeCompare(b.id));
     if (flows.length) {
-      out.push('| Flow | Viewport | Theme | Board | Frames | Commit | Flags |', '| --- | --- | --- | --- | --- | --- | --- |');
+      out.push('| Flow | Result | Viewport | Theme | Board | Frames | Commit | Flags |', '| --- | --- | --- | --- | --- | --- | --- | --- |');
       for (const c of flows) {
         const boards = (c.boards ?? [c.image]).map((b) => `\`${b}\``).join('<br>');
-        out.push(`| ${c.name} | ${c.viewport} | ${c.theme} | ${boards} | ${c.frames?.length ?? 0} | ${short(c.commit)} | ${flags(c, staleIds, config)} |`);
+        out.push(`| ${c.name} | ${cell(c.shows)} | ${c.viewport} | ${c.theme} | ${boards} | ${c.frames?.length ?? 0} | ${short(c.commit)} | ${flags(c, staleIds, config)} |`);
       }
       out.push('');
     }
@@ -76,15 +83,21 @@ export function renderIndex(store: Store, manifest: Manifest, plan: Plan, status
     out.push('## Not yet captured', '');
     for (const i of status.pending) {
       const where = i.example ?? i.route;
-      const what = i.kind === 'screen' ? `states: ${i.states.map((s) => s.name).join(', ')}` : `${i.steps.length} steps${i.writes ? ', writes data' : ''}`;
-      out.push(`- \`${i.id}\`${where ? ` (${where})` : ''}, ${what}${i.note ? `. ${i.note}` : ''}`);
+      const cov = stateCoverage(i, manifest);
+      const what =
+        i.kind === 'screen'
+          ? `${cov.captured.length}/${cov.total} states captured${cov.missing.length ? `, missing: ${cov.missing.join(', ')}` : ''}`
+          : `${i.steps.length} steps${i.writes ? ', writes data' : ''}`;
+      const needs = i.requires.length ? `; requires ${i.requires.join(', ')}` : '';
+      out.push(`- \`${i.id}\`${where ? ` (${where})` : ''}, ${what}${needs}${i.note ? `. ${i.note}` : ''}`);
     }
     out.push('');
   }
-  if (status.skipped.length) {
+  const skippedStates = plan.items.flatMap((i) => Object.entries(i.skippedStates).map(([state, why]) => `- \`${i.id}\` state ${state}: ${why}`));
+  if (status.skipped.length || skippedStates.length) {
     out.push('## Skipped', '');
     for (const i of status.skipped) out.push(`- \`${i.id}\`${i.note ? `: ${i.note}` : ''}`);
-    out.push('');
+    out.push(...skippedStates, '');
   }
   if (plan.items.length) {
     out.push(

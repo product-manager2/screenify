@@ -10,7 +10,13 @@ worktree of the repo). Two steps do the work, each in its own agent on a model s
 
 - **Discovery** reads the code and writes the plan: features, screens with the states worth seeing,
   small flows, and the files that shape each one.
-- **Capture** writes a JSON recipe per plan item and runs it with the CLI in a headless browser.
+- **Capture** prepares the environment (data, flags, theme), writes a JSON recipe per plan item,
+  runs it with the CLI in a headless browser, and then looks at every new image to confirm it shows
+  what its name says, repairing or skipping the wrong ones.
+
+The CLI only does deterministic work: it replays recipes, files images and checks what it can
+measure (landing URL, expected text, duplicate images). Every judgement (what to capture, how to
+reach it, what a shot shows, whether a shot is right) belongs to the agents.
 
 Your own turn only orchestrates: set up, hand each step to its agent, ask the user one question,
 check the result. Do not do discovery or capture yourself.
@@ -40,9 +46,13 @@ Subagents cannot ask the user anything, which is why the one question below is y
    `screenify-out/config.json` → `"platforms"` (for example `["web-desktop", "web-mobile"]`). Ask
    nothing else.
 4. **Capture.** Hand capture to the capture agent with the repository path and the chosen platforms.
-5. **Check.** `npx screenify status`. If items are still pending or recipes failed, send the capture
-   agent back once with the list. Tell the user what was captured, skipped (with reasons) and failed,
-   and point them at `screenify-out/INDEX.md`.
+   It prepares the environment first and reviews every image it files. If it reports an environment
+   blocker (app will not start, sign-in fails, an account or a gated feature it cannot switch on),
+   pass that to the user as is; do not send it back to retry until the environment changes.
+5. **Check.** `npx screenify status` shows captured/total states per item. If items are still pending
+   or recipes failed for reasons other than a blocker, send the capture agent back once with the
+   list. Tell the user what was captured, skipped (with reasons) and failed, and point them at
+   `screenify-out/INDEX.md`.
 6. **Offer a refresh schedule,** nightly or weekly, through whatever scheduler you have. A scheduled
    run is: `npx screenify discover`; if it lists changed files, the discovery agent updates the
    affected items; `npx screenify refresh` replays the recipes of stale captures with no model; the
@@ -53,7 +63,9 @@ Subagents cannot ask the user anything, which is why the one question below is y
 ## Rules
 
 - **Headless only.** Never open a visible browser window or any GUI app.
-- **No secrets in recipes**; recipes use `${ENV_VAR}`.
+- **No secrets in recipes**; recipes use `${ENV_VAR}`, including for one-time sign-in links.
+- **No mislabelled images.** Every image is reviewed after capture; a wrong one is repaired or skipped
+  with the reason, never left in the library.
 - **Writes need a disposable database.** Recipes that create, edit or delete data run only after the
   capture agent confirmed the database is local or disposable.
 - Do not edit images, the manifest, the plan or INDEX.md by hand; the CLI owns them.
@@ -61,6 +73,8 @@ Subagents cannot ask the user anything, which is why the one question below is y
 ## Reading the library
 
 - `screenify-out/INDEX.md`: start here. Features, screens, flows, paths, commit, stale marks.
-- `screens/<platform>/<feature>/<screen>/<screen>--<state>--<viewport>--<theme>.png` + `.md` sidecar.
+- `screens/<platform>/<feature>/<screen>/<screen>--<state>--<viewport>--<theme>.png` + `.md` sidecar,
+  e.g. `screens/web/tasks/task-list/task-list--empty--mobile-390x844--app-default.png` (theme is
+  `light`/`dark` only when the recipe forced it).
 - `flows/<platform>/<feature>/<flow>--<viewport>--<theme>.png` (board) + `.md`, frames in `--frames/`.
 - To find a screen by its text: `grep -rl "Button label" screenify-out/screens screenify-out/flows --include=*.md`.

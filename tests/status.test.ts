@@ -95,7 +95,7 @@ describe('staleness and index', () => {
     const s = libraryStatus(store, manifest, plan);
     expect(s.pending.map((i) => i.id)).toEqual(['screen:web:tasks:home', 'screen:web:tasks:task-list']);
     const index = renderIndex(store, manifest, plan, s, defaultConfig());
-    expect(index).toContain('- `screen:web:tasks:home` (/home), states: default');
+    expect(index).toContain('- `screen:web:tasks:home` (/home), 0/1 states captured, missing: default');
     expect(index).toContain('The plan is ready');
   });
 

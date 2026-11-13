@@ -64,3 +64,9 @@ export function changedSince(cwd: string, commit: string): Set<string> | null {
   for (const line of `${out}\n${untracked}`.split('\n')) if (line.trim()) files.add(line.trim());
   return files;
 }
+
+/** True when the app serves a different commit than the checkout (prefix match, so short hashes compare). */
+export function servedDiffers(served: string | null | undefined, checkout: string | null): boolean {
+  if (!served || !checkout) return false;
+  return !(checkout.startsWith(served) || served.startsWith(checkout));
+}

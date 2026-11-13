@@ -1,16 +1,57 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Config } from './config.js';
 
+/** Result of one HTTP probe: answered, or why not. */
+export type Probe = { ok: true } | { ok: false; reason: 'refused' | 'timeout' | 'error'; detail: string };
+
+/** Probes `url` once: any HTTP answer is ok; otherwise says whether the port refused, timed out or failed otherwise. */
+export async function probe(url: string, timeoutMs = 3000): Promise<Probe> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    await fetch(url, { signal: ctrl.signal, redirect: 'manual' });
+    return { ok: true };
+  } catch (err) {
+    if (ctrl.signal.aborted) return { ok: false, reason: 'timeout', detail: `no answer within ${timeoutMs} ms` };
+    const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+    if (cause?.code === 'ECONNREFUSED') return { ok: false, reason: 'refused', detail: 'connection refused' };
+    return { ok: false, reason: 'error', detail: cause?.message ?? cause?.code ?? (err as Error).message };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 /** True when `url` answers an HTTP request (any status) within `timeoutMs`. */
 export async function reachable(url: string, timeoutMs = 3000): Promise<boolean> {
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    await fetch(url, { signal: ctrl.signal, redirect: 'manual' });
-    clearTimeout(t);
-    return true;
-  } catch {
-    return false;
+  return (await probe(url, timeoutMs)).ok;
+}
+
+/** Plain-language reading of a failed probe: refused means down, timeout means slow. */
+export function describeProbe(url: string, p: Exclude<Probe, { ok: true }>): string {
+  const meaning = p.reason === 'refused' ? 'the app is down' : p.reason === 'timeout' ? 'the app is slow or stuck' : 'the request failed';
+  return `${url}: ${p.detail} (${meaning})`;
+}
+
+/**
+ * Probes `url` with backoff (0.5 s doubling to 5 s) until it answers, `deadline` passes (a last
+ * probe runs at the deadline) or
+ * `giveUp()` returns a reason. Returns the last failed probe, or null once it answered.
+ */
+export async function waitUntilReachable(
+  url: string,
+  deadline: number,
+  giveUp: () => string | null = () => null,
+): Promise<Exclude<Probe, { ok: true }> | null> {
+  let delay = 500;
+  for (;;) {
+    const p = await probe(url, Math.min(3000, Math.max(500, deadline - Date.now())));
+    if (p.ok) return null;
+    const stop = giveUp();
+    if (stop) throw new Error(stop);
+    const left = deadline - Date.now();
+    if (left <= 0) return p;
+    await new Promise((r) => setTimeout(r, Math.min(delay, left)));
+    delay = Math.min(delay * 2, 5000);
   }
 }
 
@@ -21,17 +62,22 @@ export interface AppHandle {
 }
 
 /**
- * Makes sure the app answers at `readyUrl`/`baseUrl`. When it does not and `config.start` is set,
- * runs that command from the repo root and waits for it; `stop()` ends the whole process group.
+ * Makes sure the app answers at `readyUrl`/`baseUrl`. Without `config.start` it keeps probing with
+ * backoff for `readyTimeout` seconds (an app that is still starting); with it, a first probe that
+ * fails runs that command from the repo root and waits up to `readyTimeout`. `stop()` ends the
+ * whole process group. Failures name the URL probed and whether it refused or timed out.
  */
 export async function ensureApp(config: Config, repoRoot: string, log: (s: string) => void): Promise<AppHandle> {
-  const probe = config.readyUrl ?? config.baseUrl;
+  const url = config.readyUrl ?? config.baseUrl;
   const none: AppHandle = { started: false, stop: async () => undefined };
-  if (!probe) return none;
-  if (await reachable(probe)) return none;
+  if (!url) return none;
   if (!config.start) {
-    throw new Error(`${probe} is not reachable and config.json has no "start" command. Start the app, or set "start".`);
+    const failed = await waitUntilReachable(url, Date.now() + config.readyTimeout * 1000);
+    if (!failed) return none;
+    throw new Error(`not reachable after ${config.readyTimeout}s: ${describeProbe(url, failed)}. Start the app, or set "start" in config.json.`);
   }
+  const first = await probe(url);
+  if (first.ok) return none;
   log(`Starting the app: ${config.start}`);
   const child: ChildProcess = spawn(config.start, {
     cwd: repoRoot,
@@ -63,12 +109,16 @@ export async function ensureApp(config: Config, repoRoot: string, log: (s: strin
       }
     }
   };
-  const deadline = Date.now() + config.startTimeoutSeconds * 1000;
-  while (Date.now() < deadline) {
-    if (exited) throw new Error(`"${config.start}" exited before ${probe} answered.\n${stderr.trim()}`);
-    if (await reachable(probe, 2000)) return { started: true, stop };
-    await new Promise((r) => setTimeout(r, 500));
+  let failed: Exclude<Probe, { ok: true }> | null;
+  try {
+    failed = await waitUntilReachable(url, Date.now() + config.readyTimeout * 1000, () =>
+      exited ? `"${config.start}" exited before ${url} answered.\n${stderr.trim()}` : null,
+    );
+  } catch (err) {
+    await stop();
+    throw err;
   }
+  if (!failed) return { started: true, stop };
   await stop();
-  throw new Error(`${probe} did not answer within ${config.startTimeoutSeconds}s of "${config.start}".\n${stderr.trim()}`);
+  throw new Error(`not reachable within ${config.readyTimeout}s of "${config.start}": ${describeProbe(url, failed)}.\n${stderr.trim()}`);
 }

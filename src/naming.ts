@@ -16,7 +16,11 @@ export function slug(input: string, maxLength = 80): string {
   return cut || 'untitled';
 }
 
-/** A viewport as captured: a name plus CSS pixel size and device scale. */
+/**
+ * A viewport as captured: a name plus CSS pixel size and device scale. Every preset is 1x so images
+ * of every viewport have one pixel per CSS pixel; a recipe that wants a sharper image sets
+ * `deviceScaleFactor` on an explicit viewport, and the label then says so (`mobile-390x844-2x`).
+ */
 export interface Viewport {
   name: string;
   width: number;
@@ -29,8 +33,8 @@ export interface Viewport {
 export const VIEWPORT_PRESETS: Record<string, Omit<Viewport, 'name'>> = {
   desktop: { width: 1440, height: 900, deviceScaleFactor: 1, isMobile: false },
   laptop: { width: 1280, height: 800, deviceScaleFactor: 1, isMobile: false },
-  tablet: { width: 820, height: 1180, deviceScaleFactor: 2, isMobile: true },
-  mobile: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true },
+  tablet: { width: 820, height: 1180, deviceScaleFactor: 1, isMobile: true },
+  mobile: { width: 390, height: 844, deviceScaleFactor: 1, isMobile: true },
 };
 
 /** A recipe's viewport entry: a preset name or an explicit size. */
@@ -48,7 +52,7 @@ export function resolveViewport(spec: ViewportSpec): Viewport {
         const width = Number(m[2]);
         const height = Number(m[3]);
         const isMobile = width < 768;
-        return { name: m[1] || (isMobile ? 'mobile' : 'desktop'), width, height, deviceScaleFactor: isMobile ? 2 : 1, isMobile };
+        return { name: m[1] || (isMobile ? 'mobile' : 'desktop'), width, height, deviceScaleFactor: 1, isMobile };
       }
       throw new Error(`Unknown viewport "${spec}". Use one of ${Object.keys(VIEWPORT_PRESETS).join(', ')} or {"width":…,"height":…}.`);
     }
@@ -59,14 +63,15 @@ export function resolveViewport(spec: ViewportSpec): Viewport {
     name: slug(spec.name ?? (isMobile ? 'mobile' : 'desktop')),
     width: spec.width,
     height: spec.height,
-    deviceScaleFactor: spec.deviceScaleFactor ?? (isMobile ? 2 : 1),
+    deviceScaleFactor: spec.deviceScaleFactor ?? 1,
     isMobile,
   };
 }
 
-/** Viewport label used in file names, e.g. `mobile-390x844`. */
-export function viewportLabel(v: Pick<Viewport, 'name' | 'width' | 'height'>): string {
-  return `${slug(v.name)}-${v.width}x${v.height}`;
+/** Viewport label used in file names, e.g. `mobile-390x844`; a scale other than 1x is appended (`-2x`). */
+export function viewportLabel(v: Pick<Viewport, 'name' | 'width' | 'height'> & { deviceScaleFactor?: number }): string {
+  const scale = v.deviceScaleFactor && v.deviceScaleFactor !== 1 ? `-${v.deviceScaleFactor}x` : '';
+  return `${slug(v.name)}-${v.width}x${v.height}${scale}`;
 }
 
 /** Identity of one captured screen state. */

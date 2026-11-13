@@ -15,6 +15,8 @@ repository's code. Your only output is a plan, written with \`screenify plan imp
 
 ## Read
 
+- **Enumerate routes first.** List every route the router defines (file-system routes, route tables,
+  navigation graphs) before reading any screen, so nothing is missed; then read screen by screen.
 - The router and navigation: every page a user can reach, its route and params.
 - Each screen's own code: its page component, the components only it uses, its data hook or API
   calls, its forms, dialogs, menus, tabs and empty, loading and error branches.
@@ -28,6 +30,24 @@ Screens: every page a user can reach, with the states worth seeing (empty, fille
 error, guest or other role, a dialog or menu open, a tab selected). Flows: small actions of four
 to six steps (create, edit, rename, delete, submit, invite), not whole-feature tours.
 
+- **Viewports are not states.** Desktop and mobile are chosen by the user and applied to every
+  item; never list "mobile" or "desktop" as a state.
+- **Screens without a URL** (dialogs, side panes, rails, sheets, command bars): plan them as a screen
+  whose "route" and "example" are the page they open from, and whose states' "how" lines give the
+  steps from there ("Open /tasks, click New task"). Capture checks that the page stays on that route.
+- **Who and what capture needs.** "auth" names the account or role to capture as (member, admin,
+  guest); leave it out for screens a signed-out visitor sees. "requires" lists what the environment
+  must provide first: a feature flag, a build or release channel, seed data ("alpha build channel",
+  "a workspace with three goals"). Read the flag and gate checks in the code to fill it: a gated
+  screen captured without its flag shows a redirect or "not available" instead.
+- **Flutter and other native apps:** screens are the routes or pages the app's navigator pushes
+  (GoRouter or Navigator routes, tab roots, bottom sheets shown with showModalBottomSheet or the
+  app's own adaptive panel). Plan states the same way; "route" is the app's route path when it has
+  one, else leave it out and give the steps from the nearest screen in each "how".
+- **Depth on large repos.** Cover every route, but give each screen only the states that look
+  different (two to five is typical); skip trivial variants. Plan flows for the core actions of each
+  feature, not every button. A repo with a hundred screens gets a plan with a hundred screens.
+
 - "feature" is the product's own name for the area (tasks, chat, goals, settings), as a user or
   the team would say it, never a URL segment or folder name such as "app" or "(main)".
 - "name" is the screen's name, or a verb-first flow name (create-task, rename-room).
@@ -35,15 +55,18 @@ to six steps (create, edit, rename, delete, submit, invite), not whole-feature t
   (/tasks/1). Leave both out for screens without a URL.
 - Each state gets a one-line "how" the capture agent can follow without reading code.
 - "steps" outline a flow in plain words; "writes" is true when it creates, edits or deletes data.
-- "note" carries anything capture needs: seed data required, a feature flag, an account role.
+- "note" carries anything else capture needs to know.
 
 ## The sources rule
 
 "sources" lists ONLY the files that actually shape that screen or flow: its page, the components
-only it uses, its own data hook, its API handler. Never the app shell, root layout, router, theme,
-global styles or shared design-system components, unless the screen is about them. Staleness
-checks exactly these files: listing a shared file marks every screen stale on every change, and
-missing the screen's own component hides real changes. Paths are repo-relative.
+only it uses, its own data hook, its API handler. A section layout (for example a Next.js
+\`layout.tsx\` for one area) that draws content of that screen (a header, tabs, a sidebar of the
+section) counts as the screen's own. Never the app shell, which means the root layout and the
+global navigation only, nor the router, theme, global styles or shared design-system components,
+unless the screen is about them. Staleness checks exactly these files: listing a shared file marks
+every screen stale on every change, and missing the screen's own component hides real changes.
+Paths are repo-relative and must exist: \`plan import\` rejects a path that is not in the checkout.
 
 ## Write the plan
 
@@ -65,7 +88,8 @@ Pipe JSON to \`screenify plan import -\` (or save it and pass the file). Shape:
         { "name": "new-task-dialog-open", "how": "Click New task" }
       ],
       "sources": ["src/pages/tasks.tsx", "src/components/TaskRow.tsx", "src/api/tasks.ts"],
-      "note": "Needs a signed-in member"
+      "auth": "member",
+      "requires": ["three seed tasks for the filled state"]
     },
     {
       "kind": "flow",
@@ -75,6 +99,7 @@ Pipe JSON to \`screenify plan import -\` (or save it and pass the file). Shape:
       "start": "task-list",
       "steps": ["Open the task list", "Click New task", "Type a title", "Save", "The task appears in the list"],
       "writes": true,
+      "auth": "member",
       "sources": ["src/components/NewTaskDialog.tsx", "src/api/tasks.ts"]
     }
   ]
@@ -93,7 +118,8 @@ they touch. Re-import the items whose screens, states, flows or sources changed,
 screens, and remove items for screens that are gone. Leave the rest alone.
 
 Finish by reporting: how many screens and flows, which features, other platforms found, and
-anything capture needs that is not in the repo (credentials, external services).`;
+anything capture needs that is not in the repo (credentials, external services, flags or build
+channels the "requires" lists name).`;
 
 /** The files changed since the plan's commit and which plan items list them. */
 export interface DiscoverChanges {

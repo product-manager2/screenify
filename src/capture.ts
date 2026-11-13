@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { composeBoard, splitFrames, type Size } from './board.js';
@@ -19,6 +20,14 @@ export interface Provenance {
   recipe?: string;
   git: GitState;
   planItem?: string;
+  /** Commit the running app reported (`config.versionUrl`); undefined when none is configured. */
+  servedCommit?: string | null;
+}
+
+/** SHA-256 of an image's decoded pixels and size, so two images that look identical hash the same. */
+export async function pixelHash(png: Buffer): Promise<string> {
+  const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+  return createHash('sha256').update(`${info.width}x${info.height}x${info.channels}:`).update(data).digest('hex');
 }
 
 /** Files one screen image and its sidecar, and records it in the manifest. */
@@ -26,7 +35,7 @@ export function recordScreen(
   store: Store,
   manifest: Manifest,
   key: ScreenKey,
-  page: { png: Buffer; title?: string; text: string; aria: string },
+  page: { png: Buffer; title?: string; text: string; aria: string; shows?: string; hash?: string },
   prov: Provenance,
 ): Capture {
   const base = screenBase(key);
@@ -52,6 +61,9 @@ export function recordScreen(
     dirty: prov.git.dirty,
     capturedAt: new Date().toISOString(),
     planItem: prov.planItem,
+    shows: page.shows,
+    hash: page.hash,
+    servedCommit: prov.servedCommit,
   };
   writeFileAtomic(join(store.dir, image), page.png);
   writeFileAtomic(join(store.dir, capture.sidecar), screenSidecar(capture, page));
@@ -65,6 +77,8 @@ export interface FrameInput {
   caption: string;
   url?: string;
   text?: string;
+  /** The agent's one line on what the frame shows. */
+  shows?: string;
 }
 
 /** Deletes a flow's previous frames, boards and sidecars so a re-capture leaves no leftovers. */
@@ -101,7 +115,7 @@ export async function recordFlow(
     const f = frames[i];
     const path = `${framesDir}/${frameFileName(i + 1, f.caption)}`;
     writeFileAtomic(join(store.dir, path), f.png);
-    recorded.push({ step: i + 1, caption: f.caption, path, url: f.url });
+    recorded.push({ step: i + 1, caption: f.caption, path, url: f.url, shows: f.shows });
     const m = await sharp(f.png).metadata();
     sized.push({ width: m.width ?? 1, height: m.height ?? 1, i });
   }
@@ -140,6 +154,8 @@ export async function recordFlow(
     dirty: prov.git.dirty,
     capturedAt: new Date().toISOString(),
     planItem: prov.planItem,
+    shows: frames[frames.length - 1]?.shows,
+    servedCommit: prov.servedCommit,
   };
   writeFileAtomic(join(store.dir, capture.sidecar), flowSidecar(capture, frames.map((f) => f.text), description));
   manifest.captures[capture.id] = capture;
