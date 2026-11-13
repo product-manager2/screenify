@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, rmSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { composeBoard, splitFrames, type Size } from './board.js';
 import { writeFileAtomic } from './fsutil.js';
 import type { GitState } from './git.js';
@@ -173,7 +173,22 @@ export function titleCase(s: string): string {
  * new ones looking current.
  */
 export function removeCapture(store: Store, manifest: Manifest, capture: Capture): void {
-  for (const rel of [...(capture.boards ?? [capture.image]), capture.sidecar]) rmSync(join(store.dir, rel), { force: true });
-  if (capture.kind === 'flow') rmSync(join(store.dir, `${capture.id}--frames`), { recursive: true, force: true });
+  for (const rel of [...(capture.boards ?? [capture.image]), capture.sidecar]) rmSync(libraryPath(store, rel), { force: true });
+  if (capture.kind === 'flow') rmSync(libraryPath(store, `${capture.id}--frames`), { recursive: true, force: true });
   delete manifest.captures[capture.id];
+}
+
+/**
+ * Resolves a manifest path for deletion, refusing anything outside the store's `screens/` and
+ * `flows/` folders: the manifest is a file on disk, and a damaged or edited one must never turn a
+ * cleanup into a delete elsewhere.
+ */
+export function libraryPath(store: Store, rel: string): string {
+  const full = resolve(store.dir, rel);
+  const inside = ['screens', 'flows'].some((top) => {
+    const root = resolve(store.dir, top);
+    return full !== root && full.startsWith(root + sep);
+  });
+  if (isAbsolute(rel) || !inside) throw new Error(`refusing to delete "${rel}": it is outside the library's screens/ and flows/ folders`);
+  return full;
 }
