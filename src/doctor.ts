@@ -13,7 +13,7 @@ export interface Check {
   detail: string;
 }
 
-/** Checks Node, the store and link, config, app reachability, the browser and installed skills. */
+/** Checks Node, the store and link, config, app reachability, the browser, and installed skills and agents. */
 export async function doctor(store: Store): Promise<Check[]> {
   const checks: Check[] = [];
   const major = Number(process.versions.node.split('.')[0]);
@@ -43,7 +43,10 @@ export async function doctor(store: Store): Promise<Check[]> {
   const home = homeDir();
   for (const [name, tool, path] of [
     ['skill (Claude Code)', join(home, '.claude'), join(home, '.claude', 'skills', 'screenify', 'SKILL.md')],
+    ['agent screenify-discover (Claude Code)', join(home, '.claude'), join(home, '.claude', 'agents', 'screenify-discover.md')],
+    ['agent screenify-capture (Claude Code)', join(home, '.claude'), join(home, '.claude', 'agents', 'screenify-capture.md')],
     ['skill (Codex)', join(home, '.codex'), join(home, '.agents', 'skills', 'screenify', 'SKILL.md')],
+    ['agent screenify (Codex)', join(home, '.codex'), join(home, '.codex', 'agents', 'screenify.toml')],
   ] as const) {
     if (!existsSync(tool)) checks.push({ name, ok: true, detail: 'tool not installed; nothing to do' });
     else checks.push({ name, ok: existsSync(path), detail: existsSync(path) ? path : 'not installed (run screenify init)' });

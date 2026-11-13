@@ -5,7 +5,7 @@ import { recordFlow, recordScreen, type FrameInput } from './capture.js';
 import { gitState } from './git.js';
 import { loadManifest, saveManifest } from './manifest.js';
 import { flowBase, slug } from './naming.js';
-import { loadPlan, planItemId, savePlan } from './plan.js';
+import { loadPlan, planItemId, savePlan, type Plan } from './plan.js';
 import type { Store } from './store.js';
 import { writeIndex } from './indexfile.js';
 
@@ -26,6 +26,12 @@ export interface AddOptions {
   route?: string;
   /** Visible text to put in the sidecar, if the agent has it. */
   text?: string;
+}
+
+/** `--source` files given to `add` override the plan item's; otherwise the plan item's apply. */
+function sourcesFor(own: string[], plan: Plan, planId: string): { sources: string[]; sourcesFrom: 'plan' | 'capture' } {
+  if (own.length) return { sources: own, sourcesFrom: 'capture' };
+  return { sources: plan.items.find((i) => i.id === planId)?.sources ?? [], sourcesFrom: 'plan' };
 }
 
 /**
@@ -51,11 +57,13 @@ export async function addImage(store: Store, opts: AddOptions): Promise<string> 
     if (opts.step <= frames.length) frames[opts.step - 1] = frame;
     else if (opts.step === frames.length + 1) frames.push(frame);
     else throw new Error(`step ${opts.step} would leave a gap: the flow has ${frames.length} frame(s)`);
+    const own = [...new Set([...(existing?.sourcesFrom === 'capture' ? existing.sources : []), ...(opts.sources ?? [])])].sort();
+    const planId = planItemId('flow', opts.platform, opts.feature, opts.flow);
     const c = await recordFlow(store, manifest, key, frames, {
       route: opts.route,
-      sources: [...new Set([...(existing?.sources ?? []), ...(opts.sources ?? [])])],
+      ...sourcesFor(own, plan, planId),
       git,
-      planItem: planItemId('flow', opts.platform, opts.feature, opts.flow),
+      planItem: planId,
     });
     id = c.id;
   } else {
@@ -65,7 +73,7 @@ export async function addImage(store: Store, opts: AddOptions): Promise<string> 
       manifest,
       { platform: opts.platform, feature: opts.feature, screen: opts.screen, state: opts.state ?? 'default', viewport, theme },
       { png, text: opts.text ?? '', aria: '' },
-      { route: opts.route, sources: opts.sources ?? [], git, planItem: planItemId('screen', opts.platform, opts.feature, opts.screen) },
+      { route: opts.route, ...sourcesFor(opts.sources ?? [], plan, planItemId('screen', opts.platform, opts.feature, opts.screen)), git, planItem: planItemId('screen', opts.platform, opts.feature, opts.screen) },
     );
     id = c.id;
   }

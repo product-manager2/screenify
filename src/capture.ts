@@ -14,6 +14,8 @@ export interface Provenance {
   route?: string;
   url?: string;
   sources: string[];
+  /** See {@link Capture.sourcesFrom}. */
+  sourcesFrom: 'plan' | 'capture';
   recipe?: string;
   git: GitState;
   planItem?: string;
@@ -43,6 +45,7 @@ export function recordScreen(
     route: prov.route,
     url: prov.url,
     sources: prov.sources,
+    sourcesFrom: prov.sourcesFrom,
     recipe: prov.recipe,
     commit: prov.git.commit,
     branch: prov.git.branch,
@@ -130,6 +133,7 @@ export async function recordFlow(
     route: prov.route,
     url: prov.url,
     sources: prov.sources,
+    sourcesFrom: prov.sourcesFrom,
     recipe: prov.recipe,
     commit: prov.git.commit,
     branch: prov.git.branch,

@@ -5,13 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { addImage } from './add.js';
 import { composeAdHocBoard } from './boardcmd.js';
-import { discover } from './discover/index.js';
+import { discoverChanges, headCommit, renderDiscover } from './discover.js';
 import { doctor } from './doctor.js';
 import { writeIndex } from './indexfile.js';
 import { init } from './init.js';
 import { loadManifest } from './manifest.js';
 import { slug } from './naming.js';
-import { findPlanItem, loadPlan, mergePlan, planItemId, savePlan, type PlanItem } from './plan.js';
+import { findPlanItem, importPlan, loadPlan, parsePlanImport, parsePlanItem, removePlanItem, savePlan, upsertPlanItem, type PlanItem } from './plan.js';
 import { refresh } from './refresh.js';
 import { listRecipes, locateRecipe, runRecipes, type RecipeResult } from './run.js';
 import { libraryStatus } from './status.js';
@@ -22,10 +22,14 @@ const HELP = `screenify: an organised screenshot library of this repo's app, for
 Usage: screenify <command> [options]
 
   init                       Create the shared store, link screenify-out, .gitignore it, install the skill
-  discover [--json]          Read the code and write plan.json (screens, states, flow candidates)
+  discover [--json]          Print the discovery agent's brief (what to read, the plan JSON shape)
+                             and, when a plan exists, the files changed since its commit
   plan show [--json]         List plan items and their capture status
-  plan add --kind screen|flow --feature F --name N [--platform web] [--route R]
-           [--source FILE]... [--state S]... [--note TEXT]
+  plan import <file|->       Merge the agent's plan JSON by id (status kept; unmentioned items reported)
+  plan add --kind screen|flow --feature F --name N --source FILE... [--platform web]
+           [--route R] [--example PATH] [--state "name: how to reach it"]...
+           [--start SCREEN] [--step TEXT]... [--writes] [--note TEXT]
+  plan remove <id>           Drop an item from the plan (its captures stay filed)
   plan done <id> [--skip] [--note TEXT]
   run <recipe>... [--base-url URL] [--allow-writes] [--json]
                              Replay recipes headlessly and file the captures
@@ -81,9 +85,19 @@ function printResults(results: RecipeResult[]): number {
   return failed;
 }
 
-function describeItem(i: PlanItem): string {
-  const states = i.kind === 'screen' && i.states.length ? ` states: ${i.states.join(', ')}` : '';
-  return `[${i.status}] ${i.id}${i.route ? `  ${i.route}` : ''}${states}${i.file ? `  (${i.file})` : ''}${i.note ? `  note: ${i.note}` : ''}`;
+function describeItem(i: PlanItem): string[] {
+  const lines = [`[${i.status}] ${i.id}${i.example ?? i.route ? `  ${i.example ?? i.route}` : ''}${i.writes ? '  (writes data)' : ''}`];
+  for (const s of i.states) lines.push(`    state ${s.name}: ${s.how}`);
+  if (i.steps.length) lines.push(`    steps${i.start ? ` from ${i.start}` : ''}: ${i.steps.join(' → ')}`);
+  lines.push(`    sources: ${i.sources.join(', ') || '(none)'}`);
+  if (i.note) lines.push(`    note: ${i.note}`);
+  return lines;
+}
+
+/** Parses `--state "name: how"` into the plan's state shape. */
+function stateFlag(v: string): { name: string; how: string } {
+  const at = v.indexOf(':');
+  return at < 0 ? { name: v.trim(), how: '' } : { name: v.slice(0, at).trim(), how: v.slice(at + 1).trim() };
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -112,7 +126,7 @@ async function main(argv: string[]): Promise<number> {
       print(`Store: ${r.store.dir}`);
       for (const c of r.changes) if (c.action !== 'unchanged') print(`${c.action.padEnd(8)} ${c.path}${c.note ? `  (${c.note})` : ''}`);
       if (r.changes.every((c) => c.action === 'unchanged' || c.action === 'skipped')) print('Nothing to change; already set up.');
-      print('Next: screenify discover');
+      print('Next: ask your agent to use the screenify skill (discovery starts with "screenify discover").');
     }
     return r.linkNote ? 1 : 0;
   }
@@ -124,21 +138,10 @@ async function main(argv: string[]): Promise<number> {
   switch (cmd) {
     case 'discover': {
       const { values } = parse(rest);
-      const d = discover(store.repoRoot);
-      const plan = mergePlan(loadPlan(store), d.items, d.frameworks);
-      savePlan(store, plan);
-      writeIndex(store);
-      if (values.json) {
-        print(JSON.stringify({ ...plan, otherPlatforms: d.otherPlatforms }, null, 2));
-        return 0;
-      }
-      const screens = plan.items.filter((i) => i.kind === 'screen');
-      const flows = plan.items.filter((i) => i.kind === 'flow');
-      print(`Frameworks: ${d.frameworks.join(', ') || 'none recognised'}`);
-      print(`Plan: ${screens.length} screens, ${flows.length} flow candidates → screenify-out/plan.json`);
-      if (d.otherPlatforms.length) print(`Other platforms in the repo: ${d.otherPlatforms.join(', ')} (capture with their own tools, file with "screenify add")`);
-      if (plan.needs_agent) print('No supported router found: read the code and add items with "screenify plan add".');
-      print('Next: "screenify plan show", then write recipes under screenify-out/recipes/ and "screenify run".');
+      const plan = loadPlan(store);
+      const changes = discoverChanges(store, plan);
+      if (values.json) print(JSON.stringify({ brief: renderDiscover(plan, changes), items: plan.items.length, ...changes }, null, 2));
+      else print(renderDiscover(plan, changes));
       return 0;
     }
     case 'plan': {
@@ -148,8 +151,35 @@ async function main(argv: string[]): Promise<number> {
         const { values } = parse(args);
         if (values.json) print(JSON.stringify(plan, null, 2));
         else {
-          if (!plan.items.length) print('Plan is empty: run "screenify discover" or "screenify plan add".');
-          for (const i of plan.items) print(describeItem(i));
+          if (!plan.items.length) print('Plan is empty: the discovery agent writes it ("screenify discover" prints its brief).');
+          for (const i of plan.items) for (const l of describeItem(i)) print(l);
+        }
+        return 0;
+      }
+      if (sub === 'import') {
+        const { values, positionals } = parse(args);
+        const from = positionals[0];
+        if (!from) throw new Error('give the plan JSON file, or - to read standard input');
+        const text = from === '-' ? readFileSync(0, 'utf8') : readFileSync(from, 'utf8');
+        let doc: unknown;
+        try {
+          doc = JSON.parse(text);
+        } catch (err) {
+          throw new Error(`plan import: invalid JSON: ${(err as Error).message}`);
+        }
+        const report = importPlan(plan, parsePlanImport(doc), headCommit(store));
+        savePlan(store, plan);
+        writeIndex(store);
+        if (values.json) {
+          print(JSON.stringify({ commit: plan.commit, ...report }, null, 2));
+          return 0;
+        }
+        print(`Imported: ${report.added.length} added, ${report.updated.length} updated, ${report.unchanged.length} unchanged (plan now ${plan.items.length} items, commit ${plan.commit?.slice(0, 12) ?? 'none'})`);
+        for (const id of report.added) print(`added     ${id}`);
+        for (const id of report.updated) print(`updated   ${id}`);
+        if (report.vanished.length) {
+          print('Not in this import (kept; "screenify plan remove <id>" any that no longer exist):');
+          for (const id of report.vanished) print(`  ${id}`);
         }
         return 0;
       }
@@ -160,33 +190,45 @@ async function main(argv: string[]): Promise<number> {
           feature: { type: 'string' },
           name: { type: 'string' },
           route: { type: 'string' },
+          example: { type: 'string' },
           source: { type: 'string', multiple: true },
           state: { type: 'string', multiple: true },
+          start: { type: 'string' },
+          step: { type: 'string', multiple: true },
+          writes: { type: 'boolean' },
           note: { type: 'string' },
         });
-        const kind = values.kind as string;
-        if (kind !== 'screen' && kind !== 'flow') throw new Error('--kind must be screen or flow');
-        if (!values.feature || !values.name) throw new Error('--feature and --name are required');
-        const id = planItemId(kind, values.platform as string, values.feature as string, values.name as string);
-        const prev = plan.items.find((i) => i.id === id);
-        const item: PlanItem = {
-          id,
-          kind,
-          platform: slug(values.platform as string),
-          feature: slug(values.feature as string),
-          name: slug(values.name as string),
-          route: values.route as string | undefined,
-          sources: ((values.source as string[]) ?? []).sort(),
-          states: kind === 'screen' ? ((values.state as string[]) ?? ['default']) : [],
-          status: prev?.status ?? 'pending',
-          captures: prev?.captures ?? [],
-          note: (values.note as string | undefined) ?? prev?.note,
-          origin: 'agent',
-        };
-        plan.items = [...plan.items.filter((i) => i.id !== id), item].sort((a, b) => a.id.localeCompare(b.id));
+        const { item, errors } = parsePlanItem(
+          {
+            kind: values.kind,
+            platform: values.platform,
+            feature: values.feature,
+            name: values.name,
+            route: values.route,
+            example: values.example,
+            states: ((values.state as string[]) ?? []).map(stateFlag),
+            start: values.start,
+            steps: values.step,
+            writes: values.kind === 'flow' ? !!values.writes : undefined,
+            sources: values.source,
+            note: values.note,
+          },
+          'plan add',
+        );
+        if (!item) throw new Error(errors.join('\n'));
+        const added = upsertPlanItem(plan, item);
         savePlan(store, plan);
         writeIndex(store);
-        print(`${prev ? 'updated' : 'added'} ${id}`);
+        print(`${added ? 'added' : 'updated'} ${item.id}`);
+        return 0;
+      }
+      if (sub === 'remove') {
+        const { positionals } = parse(args);
+        const item = positionals[0] ? removePlanItem(plan, positionals[0]) : undefined;
+        if (!item) throw new Error(`no plan item "${positionals[0] ?? ''}" (use the id from "screenify plan show")`);
+        savePlan(store, plan);
+        writeIndex(store);
+        print(`removed ${item.id}${item.captures.length ? ` (${item.captures.length} capture(s) stay filed in the library)` : ''}`);
         return 0;
       }
       if (sub === 'done') {
@@ -200,7 +242,7 @@ async function main(argv: string[]): Promise<number> {
         print(`${item.status} ${item.id}`);
         return 0;
       }
-      throw new Error(`unknown "plan ${sub}"; use show, add or done`);
+      throw new Error(`unknown "plan ${sub}"; use show, import, add, remove or done`);
     }
     case 'run': {
       const { values, positionals } = parse(rest, { 'base-url': { type: 'string' }, 'allow-writes': { type: 'boolean' } });
@@ -287,7 +329,7 @@ async function main(argv: string[]): Promise<number> {
         if (s.changed.length > 5) print(`      … ${s.changed.length - 5} more`);
       }
       for (const c of status.unknown) print(`?     ${c.id} (no source files or commit recorded)`);
-      for (const i of status.pending) print(`TODO  ${i.id}${i.route ? `  ${i.route}` : ''}`);
+      for (const i of status.pending) print(`TODO  ${i.id}${i.example ?? i.route ? `  ${i.example ?? i.route}` : ''}`);
       if (status.stale.length) print('Next: screenify refresh');
       return 0;
     }

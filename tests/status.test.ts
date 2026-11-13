@@ -4,8 +4,9 @@ import { recordScreen } from '../src/capture.js';
 import { defaultConfig } from '../src/config.js';
 import { gitState } from '../src/git.js';
 import { renderIndex } from '../src/indexmd.js';
-import { loadManifest, saveManifest } from '../src/manifest.js';
-import { openStore } from '../src/store.js';
+import { loadManifest, saveManifest, type Manifest } from '../src/manifest.js';
+import { emptyPlan, importPlan, parsePlanImport, type Plan } from '../src/plan.js';
+import { openStore, type Store } from '../src/store.js';
 import { libraryStatus } from '../src/status.js';
 import sharp from 'sharp';
 import { commitAll, isolateHome, sh, tempRepo, writeFile } from './helpers.js';
@@ -14,42 +15,88 @@ async function tinyPng(): Promise<Buffer> {
   return sharp({ create: { width: 10, height: 10, channels: 3, background: '#fff' } }).png().toBuffer();
 }
 
-const empty = { version: 1 as const, generatedAt: null, frameworks: [], needs_agent: false, items: [] };
+const screenItem = (name: string, sources: string[]) => ({
+  kind: 'screen', feature: 'tasks', name, route: `/${name}`, states: [{ name: 'default', how: `Open /${name}` }], sources,
+});
+
+/** A plan with two screens whose agent-chosen sources overlap only in a file neither edit touches. */
+function twoScreenPlan(repo: string): Plan {
+  const plan = emptyPlan();
+  importPlan(plan, parsePlanImport([screenItem('task-list', ['pages/tasks.mjs', 'api/tasks.mjs']), screenItem('home', ['pages/home.mjs'])]), sh(repo, 'git', ['rev-parse', 'HEAD']));
+  return plan;
+}
+
+async function capture(store: Store, manifest: Manifest, repo: string, name: string, sources: string[], from: 'plan' | 'capture' = 'plan') {
+  return recordScreen(
+    store,
+    manifest,
+    { platform: 'web', feature: 'tasks', screen: name, state: 'default', viewport: 'desktop-1440x900', theme: 'light' },
+    { png: await tinyPng(), text: name, aria: '' },
+    { sources, sourcesFrom: from, git: gitState(repo), recipe: `recipes/web/tasks/${name}.json`, planItem: `screen:web:tasks:${name}` },
+  );
+}
 
 describe('staleness and index', () => {
   beforeEach(() => {
     isolateHome();
   });
 
-  it('marks a capture stale when a source file changes after its commit', async () => {
-    const repo = tempRepo('next-app');
+  it('follows the plan item sources: editing a file listed for one screen marks only that screen stale', async () => {
+    const repo = tempRepo('tasks-app');
     const { store } = openStore(repo);
+    const plan = twoScreenPlan(repo);
     const manifest = loadManifest(store);
-    const png = await tinyPng();
-    const prov = (sources: string[]) => ({ sources, git: gitState(repo), recipe: 'recipes/web/tasks/tasks.json' });
-    recordScreen(store, manifest, { platform: 'web', feature: 'tasks', screen: 'tasks', state: 'default', viewport: 'desktop-1440x900', theme: 'light' }, { png, text: 'Tasks', aria: '' }, prov(['components/TaskRow.tsx']));
-    recordScreen(store, manifest, { platform: 'web', feature: 'home', screen: 'home', state: 'default', viewport: 'desktop-1440x900', theme: 'light' }, { png, text: 'Home', aria: '' }, prov(['app/page.tsx']));
-    recordScreen(store, manifest, { platform: 'ios', feature: 'home', screen: 'home', state: 'default', viewport: 'device-1x1', theme: 'light' }, { png, text: '', aria: '' }, prov([]));
+    await capture(store, manifest, repo, 'task-list', ['pages/tasks.mjs', 'api/tasks.mjs']);
+    await capture(store, manifest, repo, 'home', ['pages/home.mjs']);
     saveManifest(store, manifest);
+    expect(libraryStatus(store, manifest, plan).fresh.length).toBe(2);
 
-    let s = libraryStatus(store, manifest, empty);
-    expect(s.stale).toEqual([]);
-    expect(s.fresh.length).toBe(2);
-    expect(s.unknown.length).toBe(1);
+    writeFile(join(repo, 'shell.mjs'), '// the app shell changed; no screen lists it\n');
+    expect(libraryStatus(store, manifest, plan).stale).toEqual([]);
 
-    writeFile(join(repo, 'components/TaskRow.tsx'), 'export function TaskRow() { return <li>changed</li>; }\n');
-    s = libraryStatus(store, manifest, empty);
-    expect(s.stale.map((x) => x.capture.name)).toEqual(['tasks']);
+    writeFile(join(repo, 'pages/tasks.mjs'), 'export const tasksPage = () => "changed";\n');
     commitAll(repo);
-    s = libraryStatus(store, manifest, empty);
-    expect(s.stale.map((x) => [x.capture.name, x.reason, x.changed])).toEqual([['tasks', 'sources-changed', ['components/TaskRow.tsx']]]);
+    let s = libraryStatus(store, manifest, plan);
+    expect(s.stale.map((x) => [x.capture.name, x.reason, x.changed])).toEqual([['task-list', 'sources-changed', ['pages/tasks.mjs']]]);
+    expect(s.fresh.map((c) => c.name)).toEqual(['home']);
+
+    // Re-discovery moves a file into home's sources: existing captures follow the plan, not the list recorded at capture.
+    importPlan(plan, parsePlanImport([screenItem('home', ['pages/home.mjs', 'pages/tasks.mjs'])]), plan.commit);
+    s = libraryStatus(store, manifest, plan);
+    expect(s.stale.map((x) => x.capture.name).sort()).toEqual(['home', 'task-list']);
 
     sh(repo, 'git', ['checkout', '-q', '-b', 'feature']);
-    const index = renderIndex(store, manifest, empty, s, { ...defaultConfig(), defaultBranch: 'develop' });
+    const index = renderIndex(store, manifest, plan, s, { ...defaultConfig(), defaultBranch: 'develop' });
     expect(index).toContain('## web/tasks');
-    expect(index).toContain('`screens/web/tasks/tasks/tasks--default--desktop-1440x900--light.png`');
-    expect(index).toMatch(/\| tasks \| default .*STALE, branch main \|/);
+    expect(index).toContain('`screens/web/tasks/task-list/task-list--default--desktop-1440x900--light.png`');
+    expect(index).toMatch(/\| task-list \| default .*STALE, branch main \|/);
     expect(index).toContain('screenify refresh');
+    expect(index).toContain('items written by the discovery agent');
+    expect(index).not.toMatch(/router/i);
+  });
+
+  it("keeps a recipe's own sources over the plan's", async () => {
+    const repo = tempRepo('tasks-app');
+    const { store } = openStore(repo);
+    const plan = twoScreenPlan(repo);
+    const manifest = loadManifest(store);
+    await capture(store, manifest, repo, 'home', ['README.md'], 'capture');
+    writeFile(join(repo, 'pages/home.mjs'), '// changed\n');
+    expect(libraryStatus(store, manifest, plan).stale).toEqual([]);
+    writeFile(join(repo, 'README.md'), '# changed\n');
+    expect(libraryStatus(store, manifest, plan).stale.map((x) => x.changed)).toEqual([['README.md']]);
+  });
+
+  it('lists pending plan items with their example path and states in the index', () => {
+    const repo = tempRepo('tasks-app');
+    const { store } = openStore(repo);
+    const plan = twoScreenPlan(repo);
+    const manifest = loadManifest(store);
+    const s = libraryStatus(store, manifest, plan);
+    expect(s.pending.map((i) => i.id)).toEqual(['screen:web:tasks:home', 'screen:web:tasks:task-list']);
+    const index = renderIndex(store, manifest, plan, s, defaultConfig());
+    expect(index).toContain('- `screen:web:tasks:home` (/home), states: default');
+    expect(index).toContain('The plan is ready');
   });
 
   it('reports a missing image as stale', async () => {
@@ -57,6 +104,6 @@ describe('staleness and index', () => {
     const { store } = openStore(repo);
     const manifest = loadManifest(store);
     manifest.captures['x'] = { id: 'x', kind: 'screen', platform: 'web', feature: 'f', name: 'n', state: 'default', viewport: 'v', theme: 'light', image: 'missing.png', sidecar: 'missing.md', sources: [], commit: null, branch: null, dirty: false, capturedAt: '' };
-    expect(libraryStatus(store, manifest, empty).stale[0].reason).toBe('image-missing');
+    expect(libraryStatus(store, manifest, emptyPlan()).stale[0].reason).toBe('image-missing');
   });
 });

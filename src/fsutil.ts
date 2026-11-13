@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync, existsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 /** Reads and parses a JSON file, returning `fallback` when the file does not exist. */
 export function readJson<T>(path: string, fallback: T): T {
@@ -28,4 +28,18 @@ export function writeJson(path: string, value: unknown): void {
 /** Converts a path to forward slashes so stored paths look the same on every OS. */
 export function posix(p: string): string {
   return p.split('\\').join('/');
+}
+
+/** Recursively lists files under `dir` (absolute paths, sorted) whose path `accept`s. */
+export function walk(dir: string, accept: (path: string) => boolean): string[] {
+  const out: string[] = [];
+  const visit = (d: string) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) visit(p);
+      else if (e.isFile() && accept(p)) out.push(p);
+    }
+  };
+  if (existsSync(dir)) visit(dir);
+  return out.sort();
 }

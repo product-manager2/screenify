@@ -5,7 +5,7 @@ import { ensureApp } from './app.js';
 import { launchBrowser } from './browser.js';
 import { recordFlow, recordScreen } from './capture.js';
 import { loadConfig, type Config } from './config.js';
-import { posix, writeFileAtomic } from './fsutil.js';
+import { posix, walk, writeFileAtomic } from './fsutil.js';
 import { gitState } from './git.js';
 import { writeIndex } from './indexfile.js';
 import { loadManifest, saveManifest, type Manifest } from './manifest.js';
@@ -14,7 +14,6 @@ import { findPlanItem, loadPlan, planItemId, savePlan, type Plan, type PlanItem 
 import { loadRecipe, type Recipe } from './recipe.js';
 import { runRecipe, StepError } from './runner.js';
 import { storePaths, type Store } from './store.js';
-import { walk } from './discover/files.js';
 
 /** Outcome of running one recipe file. */
 export interface RecipeResult {
@@ -99,16 +98,10 @@ export function planItemFor(plan: Plan, recipe: Recipe): PlanItem | undefined {
   return undefined;
 }
 
-function sourcesFor(plan: Plan, recipe: Recipe, item: PlanItem | undefined): string[] {
-  if (recipe.sources?.length) return recipe.sources;
-  if (item?.sources.length) return item.sources;
-  const out = new Set<string>();
-  for (const s of recipe.steps) {
-    if (!('goto' in s)) continue;
-    const path = s.goto.startsWith('http') ? new URL(s.goto).pathname : s.goto;
-    for (const i of plan.items) if (i.kind === 'screen' && i.route && routeMatches(i.route, path)) i.sources.forEach((f) => out.add(f));
-  }
-  return [...out].sort();
+/** A recipe's own `sources` override the plan item's; otherwise the plan item's sources apply. */
+function sourcesFor(recipe: Recipe, item: PlanItem | undefined): { sources: string[]; sourcesFrom: 'plan' | 'capture' } {
+  if (recipe.sources?.length) return { sources: [...recipe.sources].sort(), sourcesFrom: 'capture' };
+  return { sources: item?.sources ?? [], sourcesFrom: 'plan' };
 }
 
 function defaultViewports(config: Config): ViewportSpec[] {
@@ -185,7 +178,7 @@ async function runOne(
   }
   const storageState = await ensureAuth(browser, store, config, recipe, baseUrl, log);
   const item = planItemFor(plan, recipe);
-  const sources = sourcesFor(plan, recipe, item);
+  const { sources, sourcesFrom } = sourcesFor(recipe, item);
   const git = gitState(store.repoRoot);
   const theme = recipe.theme ?? 'light';
   const captures: string[] = [];
@@ -201,7 +194,7 @@ async function runOne(
           manifest,
           { platform: recipe.platform, feature: recipe.feature, screen: shot.spec.screen ?? recipe.name, state: shot.spec.state ?? 'default', viewport: vlabel, theme },
           { png: shot.png, title: shot.title, text: shot.text, aria: shot.aria },
-          { route, url: shot.url, sources, recipe: relRecipe, git, planItem: item?.id },
+          { route, url: shot.url, sources, sourcesFrom, recipe: relRecipe, git, planItem: item?.id },
         );
         captures.push(c.id);
       }
@@ -211,7 +204,7 @@ async function runOne(
         manifest,
         { platform: recipe.platform, feature: recipe.feature, flow: recipe.name, viewport: vlabel, theme },
         shots.map((s) => ({ png: s.png, caption: s.caption, url: s.url, text: s.text })),
-        { route, url: shots[0]?.url, sources, recipe: relRecipe, git, planItem: item?.id },
+        { route, url: shots[0]?.url, sources, sourcesFrom, recipe: relRecipe, git, planItem: item?.id },
         recipe.description,
       );
       captures.push(c.id);

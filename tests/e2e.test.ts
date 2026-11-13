@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { cpSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import sharp from 'sharp';
@@ -7,14 +7,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { reachable } from '../src/app.js';
 import { browserAvailable } from '../src/browser.js';
 import { loadConfig, saveConfig } from '../src/config.js';
-import { discover } from '../src/discover/index.js';
+import { headCommit } from '../src/discover.js';
 import { init } from '../src/init.js';
 import { loadManifest } from '../src/manifest.js';
-import { loadPlan, mergePlan, savePlan } from '../src/plan.js';
+import { importPlan, loadPlan, parsePlanImport, savePlan } from '../src/plan.js';
 import { refresh } from '../src/refresh.js';
 import { runRecipes } from '../src/run.js';
 import { libraryStatus } from '../src/status.js';
-import { commitAll, FIXTURES, isolateHome, tempRepo, writeFile } from './helpers.js';
+import { commitAll, isolateHome, tempRepo, writeFile } from './helpers.js';
 
 const browser = await browserAvailable();
 if (!browser) console.warn('Skipping the end-to-end test: no Chrome, Edge or Playwright Chromium found (npx playwright-core install chromium).');
@@ -36,9 +36,7 @@ describe.skipIf(!browser)('end to end with headless Chrome', () => {
 
   beforeAll(async () => {
     isolateHome();
-    repo = tempRepo('next-app');
-    cpSync(join(FIXTURES, 'site', 'server.mjs'), join(repo, 'server.mjs'));
-    commitAll(repo, 'add server');
+    repo = tempRepo('tasks-app');
     port = await freePort();
     server = spawn(process.execPath, ['server.mjs'], { cwd: repo, env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
     for (let i = 0; i < 50 && !(await reachable(`http://127.0.0.1:${port}/`)); i++) await new Promise((r) => setTimeout(r, 100));
@@ -50,8 +48,16 @@ describe.skipIf(!browser)('end to end with headless Chrome', () => {
 
   it('captures a screen and a flow, tracks staleness and refreshes', async () => {
     const { store } = init(repo, { skills: false });
-    const d = discover(repo);
-    savePlan(store, mergePlan(loadPlan(store), d.items, d.frameworks));
+    // What the discovery agent would import after reading the fixture app.
+    const plan = loadPlan(store);
+    importPlan(plan, parsePlanImport({ items: [
+      { kind: 'screen', feature: 'tasks', name: 'tasks', route: '/tasks', example: '/tasks',
+        states: [{ name: 'default', how: 'Open /tasks with the seed tasks' }], sources: ['pages/tasks.mjs', 'api/tasks.mjs'] },
+      { kind: 'flow', feature: 'tasks', name: 'create-task', start: 'tasks', writes: true,
+        steps: ['Open the task list', 'Click New task', 'Type a title', 'Save; the task appears'],
+        sources: ['components/new-task-dialog.mjs', 'api/tasks.mjs'] },
+    ] }), headCommit(store));
+    savePlan(store, plan);
     const config = loadConfig(store);
     config.baseUrl = `http://127.0.0.1:${port}`;
     config.start = `PORT=${port} node server.mjs`;
@@ -82,7 +88,7 @@ describe.skipIf(!browser)('end to end with headless Chrome', () => {
     expect(existsSync(join(repo, 'screenify-out', `${screen}.png`))).toBe(true);
     const sidecar = readFileSync(join(store.dir, `${screen}.md`), 'utf8');
     expect(sidecar).toContain('route: /tasks');
-    expect(sidecar).toContain('  - components/TaskList.tsx');
+    expect(sidecar).toContain('  - pages/tasks.mjs');
     expect(sidecar).toContain('Write the report');
     expect(sidecar).toMatch(/button "New task"/);
 
@@ -96,21 +102,25 @@ describe.skipIf(!browser)('end to end with headless Chrome', () => {
     expect([frame.width, frame.height]).toEqual([780, 1688]);
     expect(readFileSync(join(store.dir, `${flow}.md`), 'utf8')).toContain('2. Click “New task”');
 
-    const plan = loadPlan(store);
-    expect(plan.items.find((i) => i.id === 'screen:web:tasks:tasks')!.status).toBe('captured');
+    const after = loadPlan(store);
+    expect(after.items.map((i) => [i.id, i.status])).toEqual([['flow:web:tasks:create-task', 'captured'], ['screen:web:tasks:tasks', 'captured']]);
     expect(readFileSync(join(store.dir, 'INDEX.md'), 'utf8')).toContain(`\`${flow}.png\``);
 
-    // A source change makes both captures stale; refresh starts the app itself and recaptures.
-    writeFile(join(repo, 'components/TaskRow.tsx'), 'export function TaskRow({ task }) { return <li className="row">{task.title}</li>; }\n');
-    commitAll(repo, 'restyle rows');
+    // Editing a file only the flow lists makes only the flow stale; the shared shell is listed by neither.
+    const dialog = join(repo, 'components/new-task-dialog.mjs');
+    writeFile(dialog, readFileSync(dialog, 'utf8').replace('<h2>New task</h2>', '<h2>Add a task</h2>'));
+    writeFile(join(repo, 'shell.mjs'), `${readFileSync(join(repo, 'shell.mjs'), 'utf8')}\n// shell tweak\n`);
+    commitAll(repo, 'rename dialog title');
     let status = libraryStatus(store, loadManifest(store), loadPlan(store));
-    expect(status.stale.map((s) => s.capture.id).sort()).toEqual([flow, screen]);
+    expect(status.stale.map((s) => s.capture.id)).toEqual([flow]);
+    expect(status.fresh.map((c) => c.id)).toEqual([screen]);
 
     server?.kill();
     for (let i = 0; i < 50 && (await reachable(`http://127.0.0.1:${port}/`, 500)); i++) await new Promise((r) => setTimeout(r, 100));
     const r = await refresh(store);
     expect(r.results.every((x) => x.ok)).toBe(true);
-    expect(r.results.length).toBe(2);
+    expect(r.results.map((x) => x.recipe)).toEqual(['recipes/web/tasks/create-task.json']);
+    expect(readFileSync(join(store.dir, `${flow}.md`), 'utf8')).toContain('Add a task');
     expect(await reachable(`http://127.0.0.1:${port}/`, 500)).toBe(false);
     status = libraryStatus(store, loadManifest(store), loadPlan(store));
     expect(status.stale).toEqual([]);

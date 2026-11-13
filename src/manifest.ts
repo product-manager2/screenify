@@ -31,8 +31,14 @@ export interface Capture {
   sidecar: string;
   route?: string;
   url?: string;
-  /** Repo-relative source files that render it. */
+  /** Repo-relative source files that rendered it, as recorded at capture time. */
   sources: string[];
+  /**
+   * Where staleness reads the sources from: `plan` follows the plan item's current sources (so a
+   * re-discovered source list applies to existing captures); `capture` keeps the recorded list
+   * (the recipe or `screenify add --source` named its own).
+   */
+  sourcesFrom?: 'plan' | 'capture';
   /** Store-relative recipe path; absent for images filed with `screenify add`. */
   recipe?: string;
   commit: string | null;

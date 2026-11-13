@@ -66,19 +66,30 @@ export function ensurePointers(repoRoot: string): InitChange[] {
   return out;
 }
 
-/** Codex custom agent file: pins the cheap model and medium effort for capture work. */
-export function codexAgentToml(): string {
-  return `# Installed by Screenify. Codex skills cannot pin a model, so the capture work runs in this
+/** Claude Code custom agents `init` installs, by file name under `skill/agents/`. */
+export const CLAUDE_AGENTS = ['screenify-discover.md', 'screenify-capture.md'] as const;
+
+/** A shipped agent file's instructions without its YAML front matter (what Codex reads). */
+export function agentBody(file: string): string {
+  return readFileSync(join(skillSourceDir(), 'agents', file), 'utf8').replace(/^---\n[\s\S]*?\n---\n+/, '');
+}
+
+/** Codex custom agent file: pins the cheap model and medium effort for discovery and capture. */
+export function codexAgentToml(skillDir: string): string {
+  return `# Installed by Screenify. Codex skills cannot pin a model, so discovery and capture run in this
 # custom agent, which can (https://developers.openai.com/codex/subagents).
 name = "screenify"
-description = "Captures and files app screenshots with the screenify CLI: discover, write recipes, run them, check status."
+description = "Screenify discovery (read the app code, write the screen plan) and capture (write recipes, run them headlessly, check status)."
 model = "${CODEX_MODEL}"
 model_reasoning_effort = "${CODEX_EFFORT}"
 developer_instructions = """
-Follow the screenify skill ($screenify). Use the screenify CLI for every capture; never drive a
-browser yourself and never open a visible browser window. Never put a secret in a recipe; use
-\${ENV_VAR} in fill values. Run recipes with "writes": true only when the database is local or
-disposable. Report what was captured, what failed, and what was skipped and why.
+You do one Screenify step per task, as the task says:
+- Discovery: follow ${join(skillDir, 'discover.md')}. Read and understand the code; write the plan
+  with "npx screenify plan import -". Do not change the repository's code.
+- Capture: follow ${join(skillDir, 'capture.md')}. Use the screenify CLI for every capture; never
+  drive a browser yourself and never open a visible browser window.
+Never put a secret in a recipe; use \${ENV_VAR} in fill values. Run recipes with "writes": true only
+when the database is local or disposable. Report what you did, what was skipped and why.
 """
 `;
 }
@@ -98,7 +109,11 @@ const OPENAI_YAML = `interface:
   default_prompt: "Use $screenify to capture and organise screenshots of this app."
 `;
 
-/** Installs the skill for Claude Code and Codex when their home folders exist. */
+/**
+ * Installs the skill for Claude Code and Codex when their home folders exist: for Claude Code the
+ * skill plus the `screenify-discover` (Sonnet) and `screenify-capture` (Haiku) custom agents; for
+ * Codex the skill, the step instructions beside it, one custom agent and a profile.
+ */
 export function installSkills(): InitChange[] {
   const home = homeDir();
   const skill = readFileSync(join(skillSourceDir(), 'SKILL.md'), 'utf8');
@@ -107,14 +122,23 @@ export function installSkills(): InitChange[] {
   if (existsSync(claude)) {
     const p = join(claude, 'skills', 'screenify', 'SKILL.md');
     out.push({ path: p, action: writeIfChanged(p, skill) });
+    for (const file of CLAUDE_AGENTS) {
+      const text = readFileSync(join(skillSourceDir(), 'agents', file), 'utf8');
+      const model = /^model: (\S+)$/m.exec(text)?.[1];
+      const agent = join(claude, 'agents', file);
+      out.push({ path: agent, action: writeIfChanged(agent, text), note: `custom agent on ${model}` });
+    }
   } else out.push({ path: claude, action: 'skipped', note: 'Claude Code not found' });
   const codex = join(home, '.codex');
   if (existsSync(codex)) {
     const dir = join(home, '.agents', 'skills', 'screenify');
     out.push({ path: join(dir, 'SKILL.md'), action: writeIfChanged(join(dir, 'SKILL.md'), skill) });
     out.push({ path: join(dir, 'agents', 'openai.yaml'), action: writeIfChanged(join(dir, 'agents', 'openai.yaml'), OPENAI_YAML) });
+    for (const [name, file] of [['discover.md', 'screenify-discover.md'], ['capture.md', 'screenify-capture.md']] as const) {
+      out.push({ path: join(dir, name), action: writeIfChanged(join(dir, name), agentBody(file)) });
+    }
     const agent = join(codex, 'agents', 'screenify.toml');
-    out.push({ path: agent, action: writeIfChanged(agent, codexAgentToml()), note: `pins ${CODEX_MODEL} at ${CODEX_EFFORT} effort` });
+    out.push({ path: agent, action: writeIfChanged(agent, codexAgentToml(dir)), note: `pins ${CODEX_MODEL} at ${CODEX_EFFORT} effort` });
     const profile = join(codex, 'screenify.config.toml');
     out.push({ path: profile, action: writeIfChanged(profile, codexProfileToml()), note: 'codex exec --profile screenify' });
   } else out.push({ path: codex, action: 'skipped', note: 'Codex not found' });

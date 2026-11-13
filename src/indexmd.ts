@@ -63,11 +63,22 @@ export function renderIndex(store: Store, manifest: Manifest, plan: Plan, status
       out.push('');
     }
   }
-  if (!captures.length) out.push('_No captures yet. Run `screenify discover`, then write and run recipes._', '');
+  if (!captures.length) {
+    out.push(
+      plan.items.length
+        ? '_No captures yet. The plan is ready: write recipes for its items and `screenify run` them._'
+        : '_No captures yet. Ask your agent to use the screenify skill: an agent reads the code and writes the plan (`screenify discover` prints its brief), then capture follows._',
+      '',
+    );
+  }
 
   if (status.pending.length) {
     out.push('## Not yet captured', '');
-    for (const i of status.pending) out.push(`- \`${i.id}\`${i.route ? ` (${i.route})` : ''}${i.note ? `: ${i.note}` : ''}`);
+    for (const i of status.pending) {
+      const where = i.example ?? i.route;
+      const what = i.kind === 'screen' ? `states: ${i.states.map((s) => s.name).join(', ')}` : `${i.steps.length} steps${i.writes ? ', writes data' : ''}`;
+      out.push(`- \`${i.id}\`${where ? ` (${where})` : ''}, ${what}${i.note ? `. ${i.note}` : ''}`);
+    }
     out.push('');
   }
   if (status.skipped.length) {
@@ -75,8 +86,11 @@ export function renderIndex(store: Store, manifest: Manifest, plan: Plan, status
     for (const i of status.skipped) out.push(`- \`${i.id}\`${i.note ? `: ${i.note}` : ''}`);
     out.push('');
   }
-  if (plan.needs_agent) {
-    out.push('_Discovery found no supported router; the plan was filled in by the agent (`screenify plan add`)._', '');
+  if (plan.items.length) {
+    out.push(
+      `_Plan: ${plan.items.length} items written by the discovery agent${plan.commit ? ` at commit ${short(plan.commit)}` : ''} (\`plan.json\`). Staleness follows each item's \`sources\`: the files that shape that screen or flow._`,
+      '',
+    );
   }
   return out.join('\n');
 }

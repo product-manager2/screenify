@@ -25,18 +25,30 @@ export interface LibraryStatus {
 }
 
 /**
+ * The files whose change makes a capture stale: its plan item's current sources (chosen by the
+ * discovery agent), unless the capture recorded its own list or has no plan item.
+ */
+export function effectiveSources(c: Capture, items: Map<string, PlanItem>): string[] {
+  const item = c.planItem ? items.get(c.planItem) : undefined;
+  if (c.sourcesFrom !== 'capture' && item?.sources.length) return item.sources;
+  return c.sources;
+}
+
+/**
  * Compares every capture's source files between its commit and the working tree.
  * One `git diff` per distinct capture commit keeps it fast on large libraries.
  */
 export function libraryStatus(store: Store, manifest: Manifest, plan: Plan): LibraryStatus {
   const result: LibraryStatus = { stale: [], fresh: [], unknown: [], pending: [], skipped: [] };
   const diffs = new Map<string, Set<string> | null>();
+  const items = new Map(plan.items.map((i) => [i.id, i]));
   for (const c of Object.values(manifest.captures)) {
     if (!existsSync(join(store.dir, c.image))) {
       result.stale.push({ capture: c, reason: 'image-missing', changed: [] });
       continue;
     }
-    if (!c.commit || !c.sources.length || !store.shared) {
+    const sources = effectiveSources(c, items);
+    if (!c.commit || !sources.length || !store.shared) {
       result.unknown.push(c);
       continue;
     }
@@ -46,7 +58,7 @@ export function libraryStatus(store: Store, manifest: Manifest, plan: Plan): Lib
       result.stale.push({ capture: c, reason: 'commit-unknown', changed: [] });
       continue;
     }
-    const changed = c.sources.filter((s) => changedFiles.has(s));
+    const changed = sources.filter((s) => changedFiles.has(s));
     if (changed.length) result.stale.push({ capture: c, reason: 'sources-changed', changed });
     else result.fresh.push(c);
   }
