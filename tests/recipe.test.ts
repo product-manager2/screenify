@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateConfig } from '../src/config.js';
 import { shotsWithoutWait, substituteEnv, validateRecipe, type Recipe } from '../src/recipe.js';
-import { routeMatches } from '../src/run.js';
+import { commitFromBody, routeMatches } from '../src/run.js';
 
 const base = { platform: 'web', feature: 'tasks', name: 'list', kind: 'screen', steps: [{ goto: '/tasks' }, { waitFor: { text: 'Tasks' } }, { shot: { shows: 'Task list' } }] };
 const withShot = (shot: unknown, kind = 'screen') => ({ ...base, kind, steps: [{ goto: '/tasks' }, { shot }, { shot }] });
@@ -69,5 +69,32 @@ describe('config validation', () => {
     expect(errs).toContain('"versionUrl" must be a non-empty string or null');
     expect(errs).toContain('"readyTimeout" must be a number of seconds above 0');
     expect(errs).toContain('"platforms" must be a list of strings');
+  });
+});
+
+describe('up-front recipe validation', () => {
+  it('checks sources and every viewport before anything runs', () => {
+    expect(validateRecipe({ ...base, sources: ['pages/a.tsx'], viewports: ['desktop', 'phone-390x844', { width: 800, height: 600, deviceScaleFactor: 2 }] })).toEqual([]);
+    const errs = validateRecipe({ ...base, sources: 'pages/a.tsx', viewports: ['huge', { width: 0, height: 600 }, { width: 10, height: 10, deviceScaleFactor: -1 }, 3] }).join('\n');
+    expect(errs).toContain('"sources" must be a list of repo-relative file paths');
+    expect(errs).toContain('viewports[0]: Unknown viewport "huge"');
+    expect(errs).toContain('viewports[1]: "width" and "height" must be whole numbers of CSS pixels above 0');
+    expect(errs).toContain('viewports[2]: "deviceScaleFactor" must be a number above 0');
+    expect(errs).toContain('viewports[3]: must be a preset name or {"width", "height"}');
+    expect(validateRecipe({ ...base, sources: ['ok', ''] }).join('\n')).toContain('"sources" must be a list');
+  });
+});
+
+describe('served commit', () => {
+  it('reads a commit or sha JSON field, or a bare hash with a letter a-f', () => {
+    expect(commitFromBody('{"commit":"ABCDEF1234"}')).toBe('abcdef1234');
+    expect(commitFromBody('{"sha":"1234567"}')).toBe('1234567');
+    expect(commitFromBody('  deadbeef1234\n')).toBe('deadbeef1234');
+  });
+  it('never reads a timestamp, a number or a UUID piece as a commit', () => {
+    expect(commitFromBody('{"time":"1731500000","id":"550e8400-e29b-41d4-a716-446655440000"}')).toBeNull();
+    expect(commitFromBody('1731500000')).toBeNull();
+    expect(commitFromBody('build 550e8400-e29b-41d4 at 1731500000')).toBeNull();
+    expect(commitFromBody('{"commit":"not-a-sha"}')).toBeNull();
   });
 });

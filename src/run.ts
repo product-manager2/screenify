@@ -1,18 +1,19 @@
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { Browser } from 'playwright-core';
 import { ensureApp } from './app.js';
-import { launchBrowser } from './browser.js';
-import { pixelHash, recordFlow, recordScreen } from './capture.js';
+import { invalidSelectors, launchBrowser } from './browser.js';
+import { pixelHash, recordFlow, recordScreen, removeCapture } from './capture.js';
 import { loadConfig, type Config } from './config.js';
 import { posix, walk, writeFileAtomic } from './fsutil.js';
 import { gitState, servedDiffers } from './git.js';
 import { writeIndex } from './indexfile.js';
-import { loadManifest, saveManifest, type Capture, type Manifest } from './manifest.js';
-import { recipePath, resolveViewport, slug, viewportLabel, type ViewportSpec } from './naming.js';
+import { loadManifest, saveManifest, type Manifest } from './manifest.js';
+import { flowBase, recipePath, resolveViewport, screenBase, slug, viewportLabel, type ScreenKey, type ViewportSpec } from './naming.js';
 import { findPlanItem, loadPlan, planItemId, savePlan, settleItemStatus, type Plan, type PlanItem } from './plan.js';
 import { loadRecipe, type Recipe } from './recipe.js';
-import { redactText, redactUrl, routeMatches, runRecipe, StepError, type Shot } from './runner.js';
+import { routeMatches, runRecipe, StepError, type Shot } from './runner.js';
+import { scrub } from './secrets.js';
 import { frontMatter } from './sidecar.js';
 import { storePaths, type Store } from './store.js';
 
@@ -31,6 +32,8 @@ export interface RecipeResult {
   failureShot?: string;
   /** What the recipe's plan item needs before capture (flags, build channel, seed), for the failure report. */
   requires?: string[];
+  /** Captures this recipe filed earlier but no longer produces; removed from the library. */
+  removed?: string[];
 }
 
 /** Options for {@link runRecipes}. */
@@ -172,12 +175,17 @@ function authViewport(recipe: Recipe) {
   return resolveViewport((recipe.viewports ?? ['desktop'])[0]);
 }
 
-/** Runs an auth recipe and saves its session; any failure becomes an AuthError naming the final URL and alert text. */
-async function signIn(browser: Browser, store: Store, config: Config, recipe: Recipe, relRecipe: string, baseUrl: string | null): Promise<string> {
-  const state = authStatePath(store, recipe.platform, recipe.name);
+/**
+ * Runs an auth recipe and saves its session; any failure removes the saved session and becomes an
+ * AuthError naming the final URL and alert text.
+ */
+async function signIn(ctx: BatchContext, recipe: Recipe, relRecipe: string): Promise<string> {
+  const state = authStatePath(ctx.store, recipe.platform, recipe.name);
   mkdirSync(dirname(state), { recursive: true });
+  rmSync(state, { force: true });
   try {
-    await runRecipe(browser, recipe, { baseUrl, viewport: authViewport(recipe), theme: recipe.theme, hide: config.hide, saveStorageState: state });
+    const baseUrl = ctx.opts.baseUrl ?? ctx.config.baseUrl;
+    await runRecipe(ctx.browser, recipe, { baseUrl, viewport: authViewport(recipe), theme: recipe.theme, hide: ctx.config.hide, saveStorageState: state });
   } catch (err) {
     const parts = [`sign-in "${recipe.name}" failed (${relRecipe}): ${(err as Error).message}`];
     if (err instanceof StepError) {
@@ -187,17 +195,29 @@ async function signIn(browser: Browser, store: Store, config: Config, recipe: Re
     parts.push('This is an environment problem (account, password, one-time link); fix it before running other recipes.');
     throw new AuthError(parts.join('\n'), err);
   }
+  ctx.signedIn.set(`${slug(recipe.platform)}--${slug(recipe.name)}`, state);
   return state;
 }
 
-/** Returns the saved session for a recipe's `auth`, signing in once when none is saved yet. */
-async function ensureAuth(browser: Browser, store: Store, config: Config, recipe: Recipe, baseUrl: string | null, log: (s: string) => void): Promise<string | undefined> {
+/**
+ * Returns the session for a recipe's `auth`, signing in once per batch. A session saved by an
+ * earlier run is never trusted (it may have expired, which would fail every recipe separately on
+ * the sign-in page). A missing or broken auth recipe is an AuthError too, so it stops the batch once.
+ */
+async function ensureAuth(ctx: BatchContext, recipe: Recipe): Promise<string | undefined> {
   if (!recipe.auth) return undefined;
-  const state = authStatePath(store, recipe.platform, recipe.auth);
-  if (existsSync(state)) return state;
-  const authRecipePath = findAuthRecipe(store, recipe.platform, recipe.auth);
-  log(`Signing in with ${authRecipePath}`);
-  return signIn(browser, store, config, loadRecipe(join(store.dir, authRecipePath)), authRecipePath, baseUrl);
+  const done = ctx.signedIn.get(`${slug(recipe.platform)}--${slug(recipe.auth)}`);
+  if (done) return done;
+  let authRecipePath: string;
+  let auth: Recipe;
+  try {
+    authRecipePath = findAuthRecipe(ctx.store, recipe.platform, recipe.auth);
+    auth = loadRecipe(join(ctx.store.dir, authRecipePath));
+  } catch (err) {
+    throw new AuthError(`sign-in "${recipe.auth}" cannot run: ${(err as Error).message}`, err);
+  }
+  ctx.opts.log?.(`Signing in with ${authRecipePath}`);
+  return signIn(ctx, auth, authRecipePath);
 }
 
 /** Theme label for file names: the forced theme, or `app-default` when the recipe forces none. */
@@ -206,31 +226,36 @@ export function themeLabel(recipe: Recipe): string {
 }
 
 /**
- * Fails a screen run whose images repeat: two states in this run with identical pixels, or a state
- * identical to another capture in the library (other than the ones this recipe is replacing).
+ * The commit in a version endpoint's answer. The contract: JSON with a `commit` or `sha` field
+ * holding 7 to 40 hex digits, or a plain-text body that is exactly such a hash and has at least
+ * one letter a-f (so a timestamp or a number is never read as a commit). Anything else is null.
  */
-function checkDuplicates(shots: Shot[], hashes: string[], manifest: Manifest, recipe: Recipe, relRecipe: string, vlabel: string, theme: string): void {
-  const name = (s: Shot) => `${s.spec.screen ?? recipe.name} ${s.spec.state ?? 'default'}`;
-  for (let i = 0; i < shots.length; i++) {
-    const j = hashes.indexOf(hashes[i]);
-    if (j < i) throw new StepError(`${name(shots[j])} and ${name(shots[i])} are the same image (steps ${shots[j].step} and ${shots[i].step}); the step between them did not change the page`, shots[i].step, shots[i].png);
-    const replaced = (c: Capture) => c.recipe === relRecipe && c.viewport === vlabel && c.theme === slug(theme);
-    const other = Object.values(manifest.captures).find((c) => c.hash === hashes[i] && !replaced(c));
-    if (other) throw new StepError(`${name(shots[i])} is the same image as ${other.id} (step ${shots[i].step})`, shots[i].step, shots[i].png);
+export function commitFromBody(body: string): string | null {
+  const hex = /^[0-9a-f]{7,40}$/i;
+  try {
+    const doc = JSON.parse(body);
+    if (doc && typeof doc === 'object') {
+      for (const k of ['commit', 'sha']) if (typeof doc[k] === 'string' && hex.test(doc[k])) return doc[k].toLowerCase();
+      return null;
+    }
+  } catch {
+    /* not JSON: read it as plain text */
   }
+  const text = body.trim();
+  return hex.test(text) && /[a-f]/i.test(text) ? text.toLowerCase() : null;
 }
 
-/** Reads the commit the running app reports at `config.versionUrl`: the first 7 to 40 hex digits in the answer. */
+/** Reads the commit the running app reports at `config.versionUrl` (see {@link commitFromBody}). */
 export async function servedCommit(config: Config, baseUrl: string | null, log: (s: string) => void): Promise<string | null | undefined> {
   if (!config.versionUrl) return undefined;
   const url = baseUrl ? new URL(config.versionUrl, baseUrl).toString() : config.versionUrl;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    const sha = /\b[0-9a-f]{7,40}\b/i.exec(await res.text())?.[0]?.toLowerCase() ?? null;
-    if (!sha) log(`warning: ${redactUrl(url)} answered without a commit hash; captures record no served commit`);
+    const sha = commitFromBody(await res.text());
+    if (!sha) log(`warning: ${url} did not answer with {"commit": "<sha>"} or a bare commit hash; captures record no served commit`);
     return sha;
   } catch (err) {
-    log(`warning: could not read the served commit from ${redactUrl(url)}: ${(err as Error).message}`);
+    log(`warning: could not read the served commit from ${url}: ${(err as Error).message}`);
     return null;
   }
 }
@@ -243,41 +268,113 @@ interface BatchContext {
   plan: Plan;
   opts: RunRecipesOptions;
   served: string | null | undefined;
+  /** Sessions signed in during this batch, by `<platform>--<auth name>`. */
+  signedIn: Map<string, string>;
 }
 
-async function captureViewport(ctx: BatchContext, recipe: Recipe, relRecipe: string, item: PlanItem | undefined, spec: ViewportSpec, storageState?: string): Promise<string[]> {
-  const { store, config, manifest } = ctx;
-  const baseUrl = ctx.opts.baseUrl ?? config.baseUrl;
+/** Every shot of one recipe at one viewport, with pixel hashes; nothing is filed yet. */
+interface ViewportShots {
+  vlabel: string;
+  shots: Shot[];
+  hashes: string[];
+}
+
+/** One screen image a run is about to file. */
+interface PendingScreen {
+  key: ScreenKey;
+  id: string;
+  shot: Shot;
+  hash: string;
+}
+
+async function shootViewport(ctx: BatchContext, recipe: Recipe, item: PlanItem | undefined, spec: ViewportSpec, storageState?: string): Promise<ViewportShots> {
   const viewport = resolveViewport(spec);
-  const vlabel = viewportLabel(viewport);
-  const theme = themeLabel(recipe);
   const shots = await runRecipe(ctx.browser, recipe, {
-    baseUrl,
+    baseUrl: ctx.opts.baseUrl ?? ctx.config.baseUrl,
     viewport,
     theme: recipe.theme,
     route: recipe.kind === 'screen' ? item?.route : undefined,
-    hide: config.hide,
+    hide: ctx.config.hide,
     storageState,
   });
-  const { sources, sourcesFrom } = sourcesFor(recipe, item);
-  const prov = { route: item?.route ?? firstGoto(recipe), sources, sourcesFrom, recipe: relRecipe, git: gitState(store.repoRoot), planItem: item?.id, servedCommit: ctx.served };
-  if (recipe.kind === 'flow') {
-    const frames = shots.map((s) => ({ png: s.png, caption: s.caption, url: s.url, text: s.text, shows: s.spec.shows }));
-    const c = await recordFlow(store, manifest, { platform: recipe.platform, feature: recipe.feature, flow: recipe.name, viewport: vlabel, theme }, frames, { ...prov, url: shots[0]?.url }, recipe.description);
-    return [c.id];
-  }
-  const hashes = await Promise.all(shots.map((s) => pixelHash(s.png)));
-  checkDuplicates(shots, hashes, manifest, recipe, relRecipe, vlabel, theme);
-  return shots.map((shot, i) => {
-    const key = { platform: recipe.platform, feature: recipe.feature, screen: shot.spec.screen ?? recipe.name, state: shot.spec.state ?? 'default', viewport: vlabel, theme };
-    const page = { png: shot.png, title: shot.title, text: shot.text, aria: shot.aria, shows: shot.spec.shows, hash: hashes[i] };
-    return recordScreen(store, manifest, key, page, { ...prov, url: shot.url }).id;
+  return { vlabel: viewportLabel(viewport), shots, hashes: await Promise.all(shots.map((s) => pixelHash(s.png))) };
+}
+
+function pendingScreens(recipe: Recipe, runs: ViewportShots[]): PendingScreen[] {
+  const theme = themeLabel(recipe);
+  return runs.flatMap((r) =>
+    r.shots.map((shot, i) => {
+      const key = { platform: recipe.platform, feature: recipe.feature, screen: shot.spec.screen ?? recipe.name, state: shot.spec.state ?? 'default', viewport: r.vlabel, theme };
+      return { key, id: screenBase(key), shot, hash: r.hashes[i] };
+    }),
+  );
+}
+
+/**
+ * Fails a screen run whose images repeat: two images this run produces with identical pixels, or one
+ * identical to a capture that stays in the library. Excluded are exactly the ids this run writes and
+ * the captures it replaces (`replaced`), so re-filing an image, even one first filed by `add`, never
+ * collides with itself.
+ */
+function checkScreenDuplicates(screens: PendingScreen[], manifest: Manifest, replaced: Set<string>): void {
+  const label = (p: PendingScreen) => `${p.key.screen} ${p.key.state}${screens.some((o) => o.key.viewport !== p.key.viewport) ? ` (${p.key.viewport})` : ''}`;
+  const writing = new Set(screens.map((p) => p.id));
+  screens.forEach((p, i) => {
+    const j = screens.findIndex((o) => o.hash === p.hash);
+    if (j < i) {
+      throw new StepError(`${label(screens[j])} and ${label(p)} are the same image (steps ${screens[j].shot.step} and ${p.shot.step}); the step between them did not change the page`, p.shot.step, p.shot.png);
+    }
+    const other = Object.values(manifest.captures).find((c) => c.hash === p.hash && !writing.has(c.id) && !replaced.has(c.id));
+    if (other) throw new StepError(`${label(p)} is the same image as ${other.id} (step ${p.shot.step})`, p.shot.step, p.shot.png);
   });
 }
 
+/** Fails a flow whose frames repeat: a step that changed nothing visible is not a step of the flow. */
+async function checkFlowFrames(recipe: Recipe, run: ViewportShots): Promise<void> {
+  run.hashes.forEach((h, i) => {
+    const j = run.hashes.indexOf(h);
+    if (j < i) {
+      const [a, b] = [run.shots[j], run.shots[i]];
+      throw new StepError(`${recipe.name} frames ${j + 1} ("${a.caption}") and ${i + 1} ("${b.caption}") are the same image (${run.vlabel}); the steps between them did not change the page`, b.step, b.png);
+    }
+  });
+}
+
+/** The plan item a screen shot belongs to: the recipe's item for its own screen, else the item named after the shot's screen. */
+function itemForShot(ctx: BatchContext, recipe: Recipe, item: PlanItem | undefined, p: PendingScreen): PlanItem | undefined {
+  if (slug(p.key.screen) === slug(recipe.name)) return item;
+  return ctx.plan.items.find((i) => i.id === planItemId('screen', recipe.platform, recipe.feature, p.key.screen));
+}
+
+/** Records a recipe's checked shots and returns the ids filed, with the plan items they belong to. */
+async function fileShots(ctx: BatchContext, recipe: Recipe, relRecipe: string, item: PlanItem | undefined, runs: ViewportShots[], screens: PendingScreen[]): Promise<{ id: string; item?: PlanItem }[]> {
+  const { store, manifest } = ctx;
+  const { sources, sourcesFrom } = sourcesFor(recipe, item);
+  const prov = { route: item?.route ?? firstGoto(recipe), sources, sourcesFrom, recipe: relRecipe, git: gitState(store.repoRoot), servedCommit: ctx.served };
+  if (recipe.kind === 'flow') {
+    const filed: { id: string; item?: PlanItem }[] = [];
+    for (const r of runs) {
+      const frames = r.shots.map((s) => ({ png: s.png, caption: s.caption, url: s.url, text: s.text, shows: s.spec.shows }));
+      const key = { platform: recipe.platform, feature: recipe.feature, flow: recipe.name, viewport: r.vlabel, theme: themeLabel(recipe) };
+      const c = await recordFlow(store, manifest, key, frames, { ...prov, planItem: item?.id, url: r.shots[0]?.url }, recipe.description);
+      filed.push({ id: c.id, item });
+    }
+    return filed;
+  }
+  return screens.map((p) => {
+    const owner = itemForShot(ctx, recipe, item, p);
+    const page = { png: p.shot.png, title: p.shot.title, text: p.shot.text, aria: p.shot.aria, shows: p.shot.spec.shows, hash: p.hash };
+    return { id: recordScreen(store, manifest, p.key, page, { ...prov, planItem: owner?.id, url: p.shot.url }).id, item: owner };
+  });
+}
+
+/** Expected ids of a run, for finding the captures this recipe filed before but no longer produces. */
+function flowIds(recipe: Recipe, runs: ViewportShots[]): string[] {
+  return runs.map((r) => flowBase({ platform: recipe.platform, feature: recipe.feature, flow: recipe.name, viewport: r.vlabel, theme: themeLabel(recipe) }));
+}
+
 async function runOne(ctx: BatchContext, relRecipe: string): Promise<RecipeResult> {
-  const { browser, store, config, plan, opts } = ctx;
-  const log = opts.log ?? (() => undefined);
+  const { store, config, plan, opts, manifest } = ctx;
   const recipe = loadRecipe(join(store.dir, relRecipe));
   if (recipe.writes && !(opts.allowWrites || config.writesAllowed)) {
     return {
@@ -287,21 +384,31 @@ async function runOne(ctx: BatchContext, relRecipe: string): Promise<RecipeResul
       skipped: 'writes: true but writes are not allowed (set "writesAllowed": true in config.json only for a local or disposable database, or pass --allow-writes)',
     };
   }
-  const baseUrl = opts.baseUrl ?? config.baseUrl;
   if (recipe.kind === 'auth') {
-    await signIn(browser, store, config, recipe, relRecipe, baseUrl);
+    await signIn(ctx, recipe, relRecipe);
     return { recipe: relRecipe, ok: true, captures: [] };
   }
   const viewports = viewportsFor(recipe, config);
-  const storageState = await ensureAuth(browser, store, config, recipe, baseUrl, log);
+  const storageState = await ensureAuth(ctx, recipe);
   const item = planItemFor(plan, recipe);
-  const captures: string[] = [];
-  for (const spec of viewports) captures.push(...(await captureViewport(ctx, recipe, relRecipe, item, spec, storageState)));
-  if (item) {
-    item.captures = [...new Set([...item.captures, ...captures])].sort();
-    settleItemStatus(item, ctx.manifest);
+  // Every viewport is shot and checked before anything is filed, so a failing recipe files nothing.
+  const runs: ViewportShots[] = [];
+  for (const spec of viewports) runs.push(await shootViewport(ctx, recipe, item, spec, storageState));
+  const screens = recipe.kind === 'screen' ? pendingScreens(recipe, runs) : [];
+  const ids = new Set(recipe.kind === 'screen' ? screens.map((p) => p.id) : flowIds(recipe, runs));
+  const replaced = new Set(Object.values(manifest.captures).filter((c) => c.recipe === relRecipe && !ids.has(c.id)).map((c) => c.id));
+  if (recipe.kind === 'screen') checkScreenDuplicates(screens, manifest, replaced);
+  else for (const r of runs) await checkFlowFrames(recipe, r);
+  const filed = await fileShots(ctx, recipe, relRecipe, item, runs, screens);
+  // Captures this recipe filed before but no longer produces (a renamed state, a dropped viewport,
+  // an app-default capture now theme-forced) would sit beside the new ones looking current: remove them.
+  for (const id of replaced) removeCapture(store, manifest, manifest.captures[id]);
+  for (const owner of new Set([...filed.map((f) => f.item), ...plan.items.filter((i) => i.captures.some((c) => replaced.has(c)))])) {
+    if (!owner) continue;
+    owner.captures = [...new Set([...owner.captures.filter((c) => !replaced.has(c)), ...filed.filter((f) => f.item === owner).map((f) => f.id)])].sort();
+    settleItemStatus(owner, manifest);
   }
-  return { recipe: relRecipe, ok: true, captures };
+  return { recipe: relRecipe, ok: true, captures: filed.map((f) => f.id), removed: replaced.size ? [...replaced].sort() : undefined };
 }
 
 /** Writes the page-at-failure image and a sidecar with the recipe, step, error and final URL (redacted). */
@@ -309,7 +416,7 @@ function recordFailure(store: Store, result: RecipeResult, err: StepError): void
   result.failureShot = `.failures/${slug(result.recipe.replace(/\.json$/, ''), 120)}.png`;
   if (err.screenshot) writeFileAtomic(join(store.dir, result.failureShot), err.screenshot);
   const fm = frontMatter({ recipe: result.recipe, step: err.step, url: err.url ?? undefined, alerts: err.alerts, failed_at: new Date().toISOString() });
-  writeFileAtomic(join(store.dir, result.failureShot.replace(/\.png$/, '.md')), `${fm}\n\n## Error\n\n\`\`\`text\n${result.error}\n\`\`\`\n`);
+  writeFileAtomic(join(store.dir, result.failureShot.replace(/\.png$/, '.md')), scrub(`${fm}\n\n## Error\n\n\`\`\`text\n${result.error}\n\`\`\`\n`));
 }
 
 /** What a failed recipe's plan item says it needs, so the report can say "needs alpha channel". */
@@ -328,7 +435,7 @@ function requiresFor(ctx: BatchContext, relRecipe: string): string[] | undefined
  * failed sign-in stops the batch once: the remaining recipes are reported as not run.
  */
 export async function runRecipes(store: Store, recipes: string[], opts: RunRecipesOptions = {}): Promise<RecipeResult[]> {
-  const log = opts.log ?? (() => undefined);
+  const log = (line: string) => opts.log?.(scrub(line));
   const config = loadConfig(store);
   if (opts.baseUrl) config.baseUrl = opts.baseUrl;
   const manifest = loadManifest(store);
@@ -341,7 +448,9 @@ export async function runRecipes(store: Store, recipes: string[], opts: RunRecip
     const checkout = gitState(store.repoRoot).commit;
     if (servedDiffers(served, checkout)) log(`warning: the app serves ${served}, the checkout is at ${checkout?.slice(0, 12)}; captures are flagged`);
     browser = (await launchBrowser()).browser;
-    const ctx: BatchContext = { browser, store, config, manifest, plan, opts, served };
+    const bad = await invalidSelectors(browser, config.hide);
+    if (bad.length) log(`warning: config.json "hide" has selectors that do not parse and hide nothing: ${bad.join(', ')}`);
+    const ctx: BatchContext = { browser, store, config, manifest, plan, opts: { ...opts, log }, served, signedIn: new Map() };
     let stopped: string | null = null;
     for (const r of recipes) {
       if (stopped) {
@@ -352,7 +461,7 @@ export async function runRecipes(store: Store, recipes: string[], opts: RunRecip
         log(`Running ${r}`);
         results.push(await runOne(ctx, r));
       } catch (err) {
-        const result: RecipeResult = { recipe: r, ok: false, captures: [], error: redactText((err as Error).message), requires: requiresFor(ctx, r) };
+        const result: RecipeResult = { recipe: r, ok: false, captures: [], error: scrub((err as Error).message), requires: requiresFor(ctx, r) };
         const step = err instanceof AuthError ? err.failure : err;
         if (step instanceof StepError) recordFailure(store, result, step);
         if (err instanceof AuthError) stopped = `the sign-in failed in ${r}; fix the environment, then run again`;

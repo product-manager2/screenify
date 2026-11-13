@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import type { Browser, Locator as PwLocator, Page } from 'playwright-core';
 import { slug, type Viewport } from './naming.js';
 import { stepAction, substituteEnv, textList, type Locator, type Recipe, type ShotSpec, type Step } from './recipe.js';
+import { scrub } from './secrets.js';
 
 /** One `shot` taken while replaying a recipe. */
 export interface Shot {
@@ -102,7 +103,7 @@ export function absoluteUrl(baseUrl: string | null, target: string): string {
 export function gotoTarget(baseUrl: string | null, target: string): string {
   if (!target.includes('${')) return absoluteUrl(baseUrl, target);
   if (!baseUrl) throw new Error('a "goto" using an environment variable needs config.json baseUrl');
-  const resolved = substituteEnv(target);
+  const resolved = substituteEnv(target, process.env, baseUrl);
   let url: string;
   try {
     url = absoluteUrl(baseUrl, resolved);
@@ -128,25 +129,6 @@ export function routeMatches(pattern: string, path: string): boolean {
   return new RegExp(`^${re || '/'}$`).test(clean);
 }
 
-/**
- * Redacts a URL's query and fragment (`/login?token=…` → `/login?[redacted]`): one-time links and
- * tokens live there, and URLs end up in console output, failure logs and sidecars.
- */
-export function redactUrl(url: string): string {
-  const cut = url.search(/[?#]/);
-  if (cut < 0) return url;
-  const rest = url.slice(cut);
-  return `${url.slice(0, cut)}${rest.startsWith('?') ? '?[redacted]' : ''}${rest.includes('#') ? '#[redacted]' : ''}`;
-}
-
-/** Redacts every absolute URL in free text, and the link targets in an ARIA outline (`/url: …`). */
-export function redactText(text: string): string {
-  return text
-    // A URL already redacted ends in "[redacted" just before the "]" the match stops at; leave it.
-    .replace(/https?:\/\/[^\s"'<>`)\]]+/g, (u: string, at: number, all: string) => (u.endsWith('[redacted') && all[at + u.length] === ']' ? u : redactUrl(u)))
-    .replace(/(\/url: )(\S+)/g, (_, k: string, u: string) => `${k}${redactUrl(u)}`);
-}
-
 const normalise = (s: string): string => s.replace(/\s+/g, ' ').trim();
 
 function tidyText(text: string): string {
@@ -163,9 +145,12 @@ async function fontsReady(page: Page): Promise<void> {
   await page.evaluate(() => (document as any).fonts?.ready).catch(() => undefined);
 }
 
-/** CSS injected into every screenshot to hide the selectors config.json names. */
-function hideStyle(hide: string[] | undefined): string | undefined {
-  return hide?.length ? `${hide.join(',\n')} { visibility: hidden !important; }` : undefined;
+/**
+ * CSS injected into every screenshot to hide the selectors config.json names: one rule per selector,
+ * because the browser drops a whole rule when one selector in its list does not parse.
+ */
+export function hideStyle(hide: string[] | undefined): string | undefined {
+  return hide?.length ? hide.map((sel) => `${sel} { visibility: hidden !important; }`).join('\n') : undefined;
 }
 
 /**
@@ -191,14 +176,21 @@ async function enterValue(page: Page, locator: Locator, value: string, opts: Run
   if (foreign) {
     throw new Error(`a value using an environment variable can only be typed on the app's own origin (${appOrigin}), but the target is on ${foreign}`);
   }
-  const resolved = substituteEnv(value);
+  const resolved = substituteEnv(value, process.env, opts.baseUrl);
   if (action === 'fill') await handle.fill(resolved, { timeout });
   else await handle.selectOption(resolved, { timeout });
 }
 
 async function runStep(page: Page, step: Step, opts: RunOptions, timeout: number): Promise<void> {
   if ('goto' in step) {
-    await page.goto(gotoTarget(opts.baseUrl, step.goto), { waitUntil: 'load', timeout: Math.max(timeout, 30_000) });
+    const target = gotoTarget(opts.baseUrl, step.goto);
+    try {
+      await page.goto(target, { waitUntil: 'load', timeout: Math.max(timeout, 30_000) });
+    } catch (err) {
+      if (!step.goto.includes('${')) throw err;
+      // Name the target as written (`${LOGIN_URL}`): the resolved URL may carry a token in its path.
+      throw new Error(`opening ${step.goto} failed: ${scrub((err as Error).message.split('\n')[0])}`);
+    }
   } else if ('click' in step) await toPlaywright(page, step.click).click({ timeout });
   else if ('fill' in step) await enterValue(page, step.fill, step.value, opts, timeout, 'fill');
   else if ('press' in step) {
@@ -283,10 +275,10 @@ async function takeShot(page: Page, recipe: Recipe, spec: ShotSpec, step: number
     step,
     caption: spec.caption ?? spec.shows,
     png,
-    url: redactUrl(page.url()),
-    title: await page.title(),
-    text: tidyText(rawText),
-    aria: redactText(aria),
+    url: scrub(page.url()),
+    title: scrub(await page.title()),
+    text: scrub(tidyText(rawText)),
+    aria: scrub(aria),
   };
 }
 
@@ -296,10 +288,10 @@ async function stepFailure(page: Page, step: number, action: string, err: unknow
   const alerts = await page
     .getByRole('alert')
     .allInnerTexts()
-    .then((all) => all.map(normalise).filter(Boolean))
+    .then((all) => all.map((a) => scrub(normalise(a))).filter(Boolean))
     .catch(() => [] as string[]);
-  const msg = redactText((err as Error).message.split('\n').slice(0, 6).join('\n'));
-  return new StepError(`step ${step} (${action}) failed: ${msg}`, step, screenshot, redactUrl(page.url()), alerts);
+  const msg = scrub((err as Error).message.split('\n').slice(0, 6).join('\n'));
+  return new StepError(`step ${step} (${action}) failed: ${msg}`, step, screenshot, scrub(page.url()), alerts);
 }
 
 /**

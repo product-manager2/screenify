@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { changedSince } from './git.js';
 import type { Capture, Manifest } from './manifest.js';
-import type { Plan, PlanItem } from './plan.js';
+import { stateCoverage, type Plan, type PlanItem } from './plan.js';
 import type { Store } from './store.js';
 
 /** A capture that no longer matches the code. */
@@ -19,7 +19,7 @@ export interface LibraryStatus {
   fresh: Capture[];
   /** Captures with no recorded sources or commit, so staleness cannot be judged. */
   unknown: Capture[];
-  /** Plan items never captured (status `pending`). */
+  /** Plan items not fully captured: status `pending`, or a screen with a state that has no capture or skip. */
   pending: PlanItem[];
   skipped: PlanItem[];
 }
@@ -63,8 +63,9 @@ export function libraryStatus(store: Store, manifest: Manifest, plan: Plan): Lib
     else result.fresh.push(c);
   }
   for (const item of plan.items) {
-    if (item.status === 'pending') result.pending.push(item);
-    else if (item.status === 'skipped') result.skipped.push(item);
+    if (item.status === 'skipped') result.skipped.push(item);
+    // Coverage, not the stored status, decides: a state added by a later import is pending at once.
+    else if (item.status === 'pending' || (item.kind === 'screen' && stateCoverage(item, manifest).missing.length)) result.pending.push(item);
   }
   return result;
 }

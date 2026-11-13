@@ -42,8 +42,9 @@ to six steps (create, edit, rename, delete, submit, invite), not whole-feature t
   screen captured without its flag shows a redirect or "not available" instead.
 - **Flutter and other native apps:** screens are the routes or pages the app's navigator pushes
   (GoRouter or Navigator routes, tab roots, bottom sheets shown with showModalBottomSheet or the
-  app's own adaptive panel). Plan states the same way; "route" is the app's route path when it has
-  one, else leave it out and give the steps from the nearest screen in each "how".
+  app's own adaptive panel). Plan states the same way. "route" is the screen's route path, or for a
+  sheet or dialog the route of the screen it opens from, with the steps from there in each "how".
+  Native images are filed with \`screenify add\`, which does not check routes.
 - **Depth on large repos.** Cover every route, but give each screen only the states that look
   different (two to five is typical); skip trivial variants. Plan flows for the core actions of each
   feature, not every button. A repo with a hundred screens gets a plan with a hundred screens.
@@ -52,7 +53,8 @@ to six steps (create, edit, rename, delete, submit, invite), not whole-feature t
   the team would say it, never a URL segment or folder name such as "app" or "(main)".
 - "name" is the screen's name, or a verb-first flow name (create-task, rename-room).
 - "route" names params (/tasks/:id); "example" is a concrete path that opens with the seed data
-  (/tasks/1). Leave both out for screens without a URL.
+  (/tasks/1). A screen without its own URL takes the route and example of the page it opens from
+  (see below), so capture still checks where it lands.
 - Each state gets a one-line "how" the capture agent can follow without reading code.
 - "steps" outline a flow in plain words; "writes" is true when it creates, edits or deletes data.
 - "note" carries anything else capture needs to know.

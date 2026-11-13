@@ -35,3 +35,22 @@ export async function browserAvailable(): Promise<string | null> {
     return null;
   }
 }
+
+/** The CSS selectors among `selectors` that the browser cannot parse (they would hide nothing). */
+export async function invalidSelectors(browser: Browser, selectors: string[]): Promise<string[]> {
+  if (!selectors.length) return [];
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    return await page.evaluate((list: string[]) => list.filter((sel) => {
+      try {
+        document.createDocumentFragment().querySelector(sel);
+        return false;
+      } catch {
+        return true;
+      }
+    }), selectors);
+  } finally {
+    await context.close();
+  }
+}

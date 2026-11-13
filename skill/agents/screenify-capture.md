@@ -59,8 +59,10 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
      `"readyTimeout"` (seconds to keep probing) when the app is ready later than its port opens,
      `"platforms"` as the user chose them (`"web-desktop"`, `"web-mobile"`), `"hide"` with the CSS
      selectors of dev-only overlays that would cover screenshots (for Next.js, `"nextjs-portal"`; find
-     the app's own by reading its dev tooling), and `"versionUrl"` if the app exposes the commit it
-     serves (a health or version endpoint), so captures from an out-of-date server are flagged.
+     the app's own by reading its dev tooling; `doctor` warns about selectors that do not parse), and
+     `"versionUrl"` if the app exposes the commit it serves, so captures from an out-of-date server
+     are flagged. The endpoint must answer JSON with a `"commit"` or `"sha"` field, or a plain-text
+     body that is only the hash; anything else records no served commit.
    - Check with `npx screenify doctor`.
    **Environment blockers stop you once.** If the app will not start, an account or credential is
    missing, sign-in fails, or a gate in `requires` cannot be switched, stop and report that blocker
@@ -70,9 +72,12 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
    `screenify-out/recipes/web/auth/login.json`; other recipes reference it with `"auth": "login"`.
    Its last step is a `waitFor` on an element only a signed-in user sees (the account menu, the
    first screen's heading), so a failed sign-in fails the recipe instead of saving a signed-out
-   session. One-time sign-in links and tokens go through a `${VAR}` `goto`, never into the file. A
-   failed sign-in stops the whole `run` once with the final URL and the page's error text: that is
-   an environment problem; report it.
+   session. One-time sign-in links and tokens go through a `${VAR}` `goto`, never into the file;
+   every value read from the environment is scrubbed from all output, sidecars and failure files.
+   Each `run` signs in once afresh (a session saved by an earlier run is never reused, since it may
+   have expired). A failed sign-in, or an auth recipe that is missing or fails to load, stops the
+   whole `run` once with the reason, the final URL and the page's error text: that is an
+   environment problem; report it.
 3. **Screens first.** For each pending screen item, write
    `screenify-out/recipes/<platform>/<feature>/<name>.json` with one `shot` per state, reaching each
    state the way its `how` line says, with a `waitFor` on something that state shows right before
@@ -93,7 +98,13 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
 6. **Repair failures.** A failed run prints the step that failed and a page-at-failure image under
    `screenify-out/.failures/` with a `.md` beside it (error, final URL, alert text). Open both, fix
    the locator, wait or environment, and run again. Two tries per recipe; then skip with a note
-   saying what blocked it.
+   saying what blocked it. A failed recipe files nothing, at any viewport.
+   **Recipes written before `shows`, flow `caption` and viewports were required** fail to load with
+   the list of what is missing (for example `step 3: "shows" must say in one line what the image
+   shows`). Repair each: add `"shows"` to every `shot`, a `"caption"` to every flow shot, a `waitFor`
+   before each shot, and `"viewports"` to the recipe unless `config.json` `"platforms"` lists
+   `web-desktop`/`web-mobile`. Unforced recipes are now labelled `app-default` instead of `light`;
+   the first successful run removes the old `--light` images that recipe filed.
 7. **Close the items.** `npx screenify status` shows captured/total states per item. A screen item is
    captured once every state has an image; for a state that cannot be captured, say why:
    `npx screenify plan done <id> --skip-state <state> --note "needs a paid account"`. Skip a whole
@@ -151,7 +162,12 @@ when you do not know which theme the image shows; it is then filed as `app-defau
     another page fails with "expected /goals, ended on /tasks".
   - `expect`: `{"visible": ["Goals"], "absent": ["isn't available"]}`; strings or lists of strings,
     matched against the page's visible text.
-  - Two states with identical pixels, or an image identical to another capture, fail the run.
+  - Two states with identical pixels, or an image identical to another capture, fail the run; in a
+    flow, two identical frames fail it (the step between them changed nothing visible).
+- A recipe owns what it filed: when a run no longer produces a capture it filed before (a renamed
+  state, a dropped viewport, a theme now forced), that capture is removed and `run` lists it.
+- A shot with `"screen"` naming another screen is filed under that screen's plan item, not the
+  recipe's, so it never counts as a state of the recipe's own screen.
 - `scrollContainer`: a locator for the inner element that scrolls when the page itself does not
   (a settings panel, a chat log); it is expanded to its full height for a full-page shot.
 - Readiness is explicit: put a `waitFor` on something the state shows before every `shot`. The CLI

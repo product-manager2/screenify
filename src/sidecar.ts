@@ -1,5 +1,5 @@
 import type { Capture } from './manifest.js';
-import { redactText, redactUrl } from './runner.js';
+import { scrub } from './secrets.js';
 
 /** Quotes a scalar for YAML front matter when it needs quoting. */
 export function yamlScalar(v: unknown): string {
@@ -49,7 +49,7 @@ function commonFields(c: Capture): Record<string, unknown> {
     theme: c.theme,
     shows: c.shows,
     route: c.route,
-    url: c.url && redactUrl(c.url),
+    url: c.url && scrub(c.url),
     recipe: c.recipe,
     commit: c.commit,
     branch: c.branch,
@@ -66,14 +66,14 @@ export function screenSidecar(c: Capture, page: { title?: string; text: string; 
     kind: 'screen',
     screen: c.name,
     state: c.state,
-    title: page.title,
+    title: page.title && scrub(page.title),
     image: c.image.split('/').pop(),
     ...commonFields(c),
   });
   const parts = [fm, '', `# ${c.feature} / ${c.name} — ${c.state} (${c.viewport}, ${c.theme})`, ''];
-  parts.push('## Visible text', '', '```text', clip(page.text || '(no text)', MAX_TEXT), '```', '');
+  parts.push('## Visible text', '', '```text', clip(scrub(page.text) || '(no text)', MAX_TEXT), '```', '');
   if (c.shows) parts.splice(4, 0, `Shows: ${c.shows}`, '');
-  if (page.aria) parts.push('## Accessibility outline', '', '```yaml', clipLines(redactText(page.aria), MAX_ARIA_LINES), '```', '');
+  if (page.aria) parts.push('## Accessibility outline', '', '```yaml', clipLines(scrub(page.aria), MAX_ARIA_LINES), '```', '');
   return parts.join('\n');
 }
 
@@ -92,9 +92,9 @@ export function flowSidecar(c: Capture, frameTexts: (string | undefined)[], desc
   (c.frames ?? []).forEach((f, i) => {
     parts.push(`${f.step}. ${f.caption}`, `   - frame: \`${f.path}\``);
     if (f.shows) parts.push(`   - shows: ${f.shows}`);
-    if (f.url) parts.push(`   - url: ${redactUrl(f.url)}`);
+    if (f.url) parts.push(`   - url: ${scrub(f.url)}`);
     const t = frameTexts[i];
-    if (t) parts.push(`   - text: ${clip(t.replace(/\n+/g, ' · '), 300)}`);
+    if (t) parts.push(`   - text: ${clip(scrub(t).replace(/\n+/g, ' · '), 300)}`);
   });
   parts.push('');
   return parts.join('\n');

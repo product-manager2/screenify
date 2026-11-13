@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import type { ViewportSpec } from './naming.js';
+import { resolveViewport, type ViewportSpec } from './naming.js';
+import { rememberSecret } from './secrets.js';
 
 /**
  * Where to find an element. Preference order when writing recipes:
@@ -110,6 +111,31 @@ function validateExpect(e: any, where: string): string[] {
   return errors;
 }
 
+/** Problems with a recipe's viewport entries, found before anything runs. */
+function viewportProblems(specs: unknown[]): string[] {
+  const errors: string[] = [];
+  specs.forEach((v, i) => {
+    if (typeof v === 'object' && v !== null) {
+      const o = v as Record<string, unknown>;
+      const positive = (n: unknown) => typeof n === 'number' && Number.isInteger(n) && n > 0;
+      if (!positive(o.width) || !positive(o.height)) errors.push(`viewports[${i}]: "width" and "height" must be whole numbers of CSS pixels above 0`);
+      if (o.deviceScaleFactor !== undefined && !(typeof o.deviceScaleFactor === 'number' && o.deviceScaleFactor > 0)) errors.push(`viewports[${i}]: "deviceScaleFactor" must be a number above 0`);
+      if (o.name !== undefined && !isText(o.name)) errors.push(`viewports[${i}]: "name" must be a non-empty string`);
+      return;
+    }
+    if (typeof v !== 'string') {
+      errors.push(`viewports[${i}]: must be a preset name or {"width", "height"}`);
+      return;
+    }
+    try {
+      resolveViewport(v);
+    } catch (err) {
+      errors.push(`viewports[${i}]: ${(err as Error).message}`);
+    }
+  });
+  return errors;
+}
+
 /** Problems in one `shot` step's options. */
 function validateShot(shot: any, kind: string, where: string): string[] {
   if (!shot || typeof shot !== 'object' || Array.isArray(shot)) return [`${where}: "shot" must be an object with at least "shows"`];
@@ -140,6 +166,9 @@ export function validateRecipe(r: any): string[] {
   }
   if (r.auth !== undefined && typeof r.auth !== 'string') errors.push('"auth" must be the name of an auth recipe');
   if (r.viewports !== undefined && (!Array.isArray(r.viewports) || !r.viewports.length)) errors.push('"viewports" must be a non-empty list');
+  else if (r.viewports) errors.push(...viewportProblems(r.viewports));
+  if (r.sources !== undefined && !(Array.isArray(r.sources) && r.sources.every(isText))) errors.push('"sources" must be a list of repo-relative file paths');
+  for (const k of ['planItem', 'description']) if (r[k] !== undefined && !isText(r[k])) errors.push(`"${k}" must be a non-empty string`);
   if (!Array.isArray(r.steps) || !r.steps.length) {
     errors.push('"steps" must be a non-empty array');
     return errors;
@@ -193,13 +222,15 @@ export function textList(v: string | string[] | undefined): string[] {
 }
 
 /**
- * Replaces `${VAR}` in a fill value with the environment variable, so recipes never hold secrets.
- * Throws when a referenced variable is not set.
+ * Replaces `${VAR}` in a recipe value with the environment variable, so recipes never hold secrets.
+ * Every substituted value is remembered so `scrub` (secrets.ts) removes it from all output; `baseUrl` lets
+ * a relative link register its resolved form too. Throws when a referenced variable is not set.
  */
-export function substituteEnv(value: string, env: NodeJS.ProcessEnv = process.env): string {
+export function substituteEnv(value: string, env: NodeJS.ProcessEnv = process.env, baseUrl?: string | null): string {
   return value.replace(/\$\{([A-Z0-9_]+)\}/gi, (_, name: string) => {
     const v = env[name];
     if (v === undefined) throw new Error(`environment variable ${name} is not set (used in a recipe value)`);
+    rememberSecret(v, baseUrl);
     return v;
   });
 }

@@ -166,3 +166,14 @@ export async function recordFlow(
 export function titleCase(s: string): string {
   return s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+/**
+ * Deletes a capture from the library: its image or boards, its sidecar, a flow's frames folder, and
+ * its manifest entry. Used for captures a recipe no longer produces, so they do not sit beside the
+ * new ones looking current.
+ */
+export function removeCapture(store: Store, manifest: Manifest, capture: Capture): void {
+  for (const rel of [...(capture.boards ?? [capture.image]), capture.sidecar]) rmSync(join(store.dir, rel), { force: true });
+  if (capture.kind === 'flow') rmSync(join(store.dir, `${capture.id}--frames`), { recursive: true, force: true });
+  delete manifest.captures[capture.id];
+}

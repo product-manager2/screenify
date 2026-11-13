@@ -99,6 +99,19 @@ describe('staleness and index', () => {
     expect(index).toContain('The plan is ready');
   });
 
+  it('lists an item as pending when its stored status says captured but a state has no capture', async () => {
+    const repo = tempRepo('tasks-app');
+    const { store } = openStore(repo);
+    const plan = twoScreenPlan(repo);
+    const manifest = loadManifest(store);
+    await capture(store, manifest, repo, 'home', ['pages/home.mjs']);
+    const home = plan.items.find((i) => i.name === 'home')!;
+    home.status = 'captured';
+    home.states.push({ name: 'error', how: 'Stop the API' });
+    expect(libraryStatus(store, manifest, plan).pending.map((i) => i.id)).toContain('screen:web:tasks:home');
+    expect(renderIndex(store, manifest, plan, libraryStatus(store, manifest, plan), defaultConfig())).toContain('1/2 states captured, missing: error');
+  });
+
   it('reports a missing image as stale', async () => {
     const repo = tempRepo();
     const { store } = openStore(repo);

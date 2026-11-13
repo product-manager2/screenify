@@ -10,7 +10,7 @@ with the steps side by side and a numbered caption under each. One `INDEX.md` li
 and Screenify knows which captures went stale because the code that renders them changed.
 
 An agent asked "what does the empty task list look like on a phone?" opens
-`screenify-out/screens/web/tasks/task-list/task-list--empty--mobile-390x844--light.png`, or greps
+`screenify-out/screens/web/tasks/task-list/task-list--empty--mobile-390x844--app-default.png`, or greps
 the sidecars for a button label, without starting the app.
 
 ## The one command
@@ -165,13 +165,19 @@ The CLI does only deterministic work. Before filing a shot it checks:
 - **Landing URL.** The page must be on the shot's `expectUrl`, or for a screen, its plan item's
   route (params as wildcards); otherwise the recipe fails with "expected /goals, ended on /tasks".
 - **Expected text.** `"expect": {"visible": [...], "absent": [...]}` against the page's visible text.
-- **Duplicates.** Two states with identical pixels, or an image identical to another capture, fail.
+- **Duplicates.** Two states with identical pixels, or an image identical to another capture, fail;
+  so do two identical frames in one flow.
+- **Nothing filed on failure.** Every viewport is shot and checked before anything is filed. A
+  recipe owns what it filed: captures it no longer produces (a renamed state, a dropped viewport,
+  a newly forced theme) are removed when it next succeeds.
 - **Readiness is explicit.** A shot runs right after the recipe's preceding `waitFor` (and web fonts);
   there is no network-idle guess, and `doctor` warns about shots without a `waitFor`.
-- **Sign-in.** A failed sign-in stops the batch once, naming the final URL and the page's alert text;
-  the remaining recipes are reported as not run, and sign-in is never retried per recipe.
+- **Sign-in.** Each run signs in once afresh (saved sessions may have expired). A failed sign-in, or
+  a missing or broken auth recipe, stops the batch once, naming the final URL and the page's alert
+  text; the remaining recipes are reported as not run.
 - **Served code.** With `versionUrl` set, each capture records the commit the app serves and the
-  index flags captures whose served commit differs from the checkout.
+  index flags captures whose served commit differs from the checkout. The endpoint answers JSON
+  with a `commit` or `sha` field (7 to 40 hex digits), or a plain-text body that is only the hash.
 
 Every image is captured with reduced motion, frozen animations and a hidden caret; `config.json`
 `hide` lists CSS selectors (dev overlays such as `nextjs-portal`) hidden in every shot, and a shot's
@@ -224,11 +230,24 @@ and broken recipes. Plain cron, replaying recipes only, needs no model at all:
 
 - **Headless only.** No visible browser window is ever opened.
 - **No secrets in recipes.** Use `${ENV_VAR}` in `fill` values and `goto` targets; Screenify refuses to
-  run when one is unset, and redacts URL queries and fragments in output, failure logs and sidecars.
+  run when one is unset. Every value read from the environment (at least four characters; for a
+  link, also its path) is scrubbed from console output, JSON, errors, failure files and sidecars
+  (visible text, title, accessibility outline), as are all URL queries and fragments. A failed
+  `goto` that read the environment is reported by its written target (`${LOGIN_URL}`). Pixels are
+  not scrubbed: a secret the page itself displays stays in the image.
 - **Writes need a disposable database.** Recipes with `"writes": true` are skipped unless
   `config.json` has `"writesAllowed": true` (or `--allow-writes` is passed). The skill tells the
   agent to set that only after confirming the database is local or disposable.
 - Screenify uploads nothing anywhere. Everything stays in the store on your machine.
+
+## Upgrading recipes
+
+Recipes written before `shows`, flow `caption` and viewports were required fail to load, and an
+unattended `screenify refresh` reports each one with the exact fields missing. Hand them to the
+capture agent (its repair step covers this): add `"shows"` to every shot, `"caption"` to every
+flow shot, a `waitFor` before each shot, and `"viewports"` unless `config.json` `platforms` names
+`web-desktop`/`web-mobile`. Unforced recipes are now labelled `app-default` rather than `light`;
+the first successful run of each removes the `--light` images it filed before.
 
 ## Not in v1
 

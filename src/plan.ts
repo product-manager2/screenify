@@ -209,9 +209,10 @@ function keepCaptureState(item: PlanItem, prev: PlanItem | undefined): PlanItem 
 
 /**
  * Merges imported items into the plan by id: imported content wins, capture status and
- * capture ids are kept. Items the import does not mention stay and are reported as vanished.
+ * capture ids are kept. With the manifest, each imported item's status is settled again, so a state
+ * the import adds shows as pending. Items the import does not mention stay and are reported as vanished.
  */
-export function importPlan(plan: Plan, items: PlanItem[], commit: string | null): ImportReport {
+export function importPlan(plan: Plan, items: PlanItem[], commit: string | null, manifest?: Manifest): ImportReport {
   const report: ImportReport = { added: [], updated: [], unchanged: [], vanished: [] };
   const byId = new Map(plan.items.map((i) => [i.id, i]));
   for (const item of items) {
@@ -219,7 +220,9 @@ export function importPlan(plan: Plan, items: PlanItem[], commit: string | null)
     if (!prev) report.added.push(item.id);
     else if (content(prev) === content(item)) report.unchanged.push(item.id);
     else report.updated.push(item.id);
-    byId.set(item.id, keepCaptureState(item, prev));
+    const next = keepCaptureState(item, prev);
+    if (manifest) settleItemStatus(next, manifest);
+    byId.set(item.id, next);
   }
   const imported = new Set(items.map((i) => i.id));
   report.vanished = plan.items.filter((i) => !imported.has(i.id)).map((i) => i.id).sort();
@@ -229,10 +232,11 @@ export function importPlan(plan: Plan, items: PlanItem[], commit: string | null)
   return report;
 }
 
-/** Adds or replaces one item, keeping capture status when it already existed. Returns whether it was new. */
-export function upsertPlanItem(plan: Plan, item: PlanItem): boolean {
+/** Adds or replaces one item, keeping capture status (settled again against `manifest` when given). Returns whether it was new. */
+export function upsertPlanItem(plan: Plan, item: PlanItem, manifest?: Manifest): boolean {
   const prev = plan.items.find((i) => i.id === item.id);
   const next = keepCaptureState(item, prev);
+  if (manifest) settleItemStatus(next, manifest);
   plan.items = [...plan.items.filter((i) => i.id !== item.id), next].sort((a, b) => a.id.localeCompare(b.id));
   return !prev;
 }
@@ -262,11 +266,12 @@ export interface StateCoverage {
   total: number;
 }
 
-/** Compares a plan item's states with the states its captures in the manifest show. */
+/** Compares a plan item's states with the states its own screen's captures in the manifest show. */
 export function stateCoverage(item: PlanItem, manifest: Manifest): StateCoverage {
   const have = new Set(
     Object.values(manifest.captures)
-      .filter((c) => c.planItem === item.id && c.kind === 'screen' && c.state)
+      // The item's own screen only: a recipe may also shoot another screen it passes through.
+      .filter((c) => c.planItem === item.id && c.kind === 'screen' && c.name === item.name && c.state)
       .map((c) => c.state as string),
   );
   const names = item.states.map((s) => s.name);

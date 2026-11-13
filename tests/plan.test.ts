@@ -137,3 +137,31 @@ describe('plan item fields and per-state coverage', () => {
     expect(missingSources(items, repo)).toEqual(['screen:web:home:home: pages/home.mjs']);
   });
 });
+
+describe('coverage follows the item\'s own screen and its current states', () => {
+  it('does not count another screen\'s shot as a state of this item', () => {
+    const plan = emptyPlan();
+    importPlan(plan, parsePlanImport([{ ...list, states: [{ name: 'default', how: 'Open' }] }]), null);
+    const manifest: Manifest = { version: 1, captures: {} };
+    const other = { ...screenCapture('screen:web:tasks:task-list', 'default'), id: 'screens/web/tasks/task-detail/task-detail--default--d--a', name: 'task-detail' };
+    manifest.captures[other.id] = other;
+    expect(stateCoverage(plan.items[0], manifest).missing).toEqual(['default']);
+    settleItemStatus(plan.items[0], manifest);
+    expect(plan.items[0].status).toBe('pending');
+  });
+
+  it('re-import that adds a state makes a captured item pending again', () => {
+    const plan = emptyPlan();
+    importPlan(plan, parsePlanImport([{ ...list, states: [{ name: 'filled', how: 'Seed' }] }]), null);
+    const manifest: Manifest = { version: 1, captures: {} };
+    const c = screenCapture('screen:web:tasks:task-list', 'filled');
+    manifest.captures[c.id] = c;
+    settleItemStatus(plan.items[0], manifest);
+    expect(plan.items[0].status).toBe('captured');
+    importPlan(plan, parsePlanImport([{ ...list, states: [{ name: 'filled', how: 'Seed' }, { name: 'error', how: 'Stop the API' }] }]), null, manifest);
+    expect(plan.items[0].status).toBe('pending');
+    const { item } = parsePlanItem({ ...list, states: [{ name: 'filled', how: 'Seed' }] }, 'plan add');
+    upsertPlanItem(plan, item!, manifest);
+    expect(plan.items[0].status).toBe('captured');
+  });
+});

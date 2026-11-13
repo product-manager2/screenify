@@ -11,6 +11,9 @@ describe('discover brief', () => {
   });
 
   it('states the plan shape and the sources rule, and asks for a full discovery when there is no plan', () => {
+    // Screens without a URL take the opener page's route, so the URL check still runs.
+    expect(DISCOVERY_BRIEF).not.toMatch(/Leave both out|else leave it out/);
+    expect(DISCOVERY_BRIEF).toContain('takes the route and example of the page it opens from');
     for (const must of ['"kind": "screen"', '"states"', '"how"', '"example"', '"steps"', '"writes"', '"sources"', 'plan import -', 'Never the app shell']) {
       expect(DISCOVERY_BRIEF).toContain(must);
     }

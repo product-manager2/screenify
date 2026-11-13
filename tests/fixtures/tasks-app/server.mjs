@@ -1,6 +1,7 @@
 // Taskly: a tiny tasks app used by Screenify's tests. Routes: / (home), /login, /tasks, /goals (gated:
 // redirects to /tasks with a notice), /account (needs a session), /settings (scrolls an inner panel),
-// /api/tasks, /api/login-attempts, /api/version (the commit in SERVED_COMMIT).
+// /auth/magic/<token> (one-time link: good-token signs in), /api/tasks, /api/login-attempts,
+// /api/version (the commit in SERVED_COMMIT).
 import { createServer } from 'node:http';
 import { tasksApi } from './api/tasks.mjs';
 import { homePage } from './pages/home.mjs';
@@ -36,6 +37,15 @@ createServer(async (req, res) => {
     }
     res.writeHead(303, { location: '/tasks', 'set-cookie': 'session=ok; Path=/' });
     return res.end();
+  }
+  if (url.pathname.startsWith('/auth/magic/')) {
+    loginAttempts++;
+    if (url.pathname === '/auth/magic/good-token') {
+      res.writeHead(303, { location: '/tasks', 'set-cookie': 'session=ok; Path=/' });
+      return res.end();
+    }
+    res.writeHead(401, { 'content-type': 'text/html; charset=utf-8' });
+    return res.end(loginPage('This sign-in link has expired'));
   }
   res.setHeader('content-type', 'text/html; charset=utf-8');
   if (url.pathname === '/login') return res.end(loginPage());

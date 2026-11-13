@@ -1,7 +1,7 @@
 import { existsSync, lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { describeProbe, probe } from './app.js';
-import { browserAvailable, INSTALL_HINT } from './browser.js';
+import { browserAvailable, INSTALL_HINT, invalidSelectors, launchBrowser } from './browser.js';
 import { loadConfig } from './config.js';
 import { homeDir } from './env.js';
 import { loadRecipe, shotsWithoutWait } from './recipe.js';
@@ -39,6 +39,19 @@ export function recipeChecks(store: Store): Check[] {
   return checks;
 }
 
+/** Warns about config `hide` selectors the browser cannot parse; each one hides nothing. */
+async function hideCheck(hide: string[]): Promise<Check> {
+  const { browser } = await launchBrowser();
+  try {
+    const bad = await invalidSelectors(browser, hide);
+    return bad.length
+      ? { name: 'config.hide', ok: true, warn: true, detail: `these selectors do not parse and hide nothing: ${bad.join(', ')}` }
+      : { name: 'config.hide', ok: true, detail: `${hide.length} selector(s) parse` };
+  } finally {
+    await browser.close();
+  }
+}
+
 /** Checks Node, the store and link, config, app reachability, the browser, and installed skills and agents. */
 export async function doctor(store: Store): Promise<Check[]> {
   const checks: Check[] = [];
@@ -73,6 +86,7 @@ export async function doctor(store: Store): Promise<Check[]> {
   }
   const browser = await browserAvailable();
   checks.push({ name: 'browser', ok: !!browser, detail: browser ? `headless ${browser}` : `none found; run: ${INSTALL_HINT}` });
+  if (browser && config.hide.length) checks.push(await hideCheck(config.hide));
   const home = homeDir();
   for (const [name, tool, path] of [
     ['skill (Claude Code)', join(home, '.claude'), join(home, '.claude', 'skills', 'screenify', 'SKILL.md')],

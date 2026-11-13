@@ -26,7 +26,7 @@ import {
 } from './plan.js';
 import { refresh } from './refresh.js';
 import { listRecipes, locateRecipe, runRecipes, type RecipeResult } from './run.js';
-import { redactText } from './runner.js';
+import { scrub } from './secrets.js';
 import { libraryStatus } from './status.js';
 import { openStore, resolveStore, storePaths, type Store } from './store.js';
 import { slug } from './naming.js';
@@ -112,14 +112,14 @@ function version(): string {
   }
 }
 
-/** Command output, on stdout. */
+/** Command output, on stdout, with environment values and URL queries scrubbed. */
 function print(line = ''): void {
-  io.out(`${line}\n`);
+  io.out(`${scrub(line)}\n`);
 }
 
-/** Notices and warnings, on stderr, so `--json` output stays parseable. */
+/** Notices and warnings, on stderr (so `--json` output stays parseable), scrubbed like stdout. */
 function notice(line: string): void {
-  io.err(`${line}\n`);
+  io.err(`${scrub(line)}\n`);
 }
 
 type OptionSpec = Record<string, { type: 'string' | 'boolean'; multiple?: boolean; default?: string }>;
@@ -147,6 +147,7 @@ function printResults(results: RecipeResult[]): number {
     } else {
       print(`ok   ${r.recipe}${r.captures.length ? '' : ' (login saved)'}`);
       for (const c of r.captures) print(`     ${c}`);
+      for (const c of r.removed ?? []) print(`     removed ${c} (this recipe no longer produces it)`);
     }
   }
   const stop = results.find((r) => r.notRun);
@@ -183,7 +184,7 @@ function filterItems(plan: Plan, manifest: Manifest, v: Record<string, any>): Pl
       (!v.platform || i.platform === slug(v.platform)) &&
       (!v.feature || i.feature === slug(v.feature)) &&
       (!v.id || i.id === v.id || i.id.endsWith(`:${v.id}`)) &&
-      (!v.pending || i.status === 'pending' || (i.kind === 'screen' && i.status !== 'skipped' && stateCoverage(i, manifest).missing.length > 0)),
+      (!v.pending || (i.status !== 'skipped' && (i.status === 'pending' || (i.kind === 'screen' && stateCoverage(i, manifest).missing.length > 0)))),
   );
 }
 
@@ -220,7 +221,7 @@ async function planCommand(store: Store, args: string[]): Promise<number> {
     }
     const items = parsePlanImport(doc);
     requireSources(items, store);
-    const report = importPlan(plan, items, headCommit(store));
+    const report = importPlan(plan, items, headCommit(store), manifest);
     savePlan(store, plan);
     writeIndex(store);
     if (values.json) {
@@ -274,7 +275,7 @@ async function planCommand(store: Store, args: string[]): Promise<number> {
     );
     if (!item) throw new Error(errors.join('\n'));
     requireSources([item], store);
-    const added = upsertPlanItem(plan, item);
+    const added = upsertPlanItem(plan, item, manifest);
     savePlan(store, plan);
     writeIndex(store);
     print(`${added ? 'added' : 'updated'} ${item.id}`);
@@ -362,7 +363,7 @@ async function command(cmd: string, rest: string[], store: Store): Promise<numbe
       const results = await runRecipes(store, located.map((l) => l.path), {
         baseUrl: values['base-url'] as string | undefined,
         allowWrites: !!values['allow-writes'],
-        log: (s) => notice(redactText(s)),
+        log: (s) => notice(s),
       });
       if (values.json) {
         print(JSON.stringify(results, null, 2));
@@ -423,7 +424,7 @@ async function command(cmd: string, rest: string[], store: Store): Promise<numbe
         all: !!values.all,
         baseUrl: values['base-url'] as string | undefined,
         allowWrites: !!values['allow-writes'],
-        log: (s) => notice(redactText(s)),
+        log: (s) => notice(s),
       });
       writeIndex(store);
       if (values.json) {
@@ -510,7 +511,7 @@ if (isEntryPoint()) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (err) => {
-      process.stderr.write(`screenify: ${redactText((err as Error).message)}\n`);
+      process.stderr.write(`screenify: ${scrub((err as Error).message)}\n`);
       process.exit(1);
     },
   );

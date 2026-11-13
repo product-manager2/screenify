@@ -1,9 +1,9 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { loadManifest } from './manifest.js';
 import { loadPlan } from './plan.js';
 import { listRecipes, runRecipes, type RecipeResult, type RunRecipesOptions } from './run.js';
 import { libraryStatus } from './status.js';
-import { storePaths, type Store } from './store.js';
+import type { Store } from './store.js';
 import { loadRecipe } from './recipe.js';
 import { join } from 'node:path';
 
@@ -15,8 +15,8 @@ export interface RefreshResult {
 }
 
 /**
- * Replays the recipes of stale captures (every screen and flow recipe with `all`), logging in
- * afresh, then rewrites the index. Needs no model: this is what a nightly job runs.
+ * Replays the recipes of stale captures (every screen and flow recipe with `all`); `runRecipes`
+ * signs in afresh once per batch. Then rewrites the index. Needs no model: this is what a nightly job runs.
  */
 export async function refresh(store: Store, opts: RunRecipesOptions & { all?: boolean } = {}): Promise<RefreshResult> {
   const manifest = loadManifest(store);
@@ -38,8 +38,6 @@ export async function refresh(store: Store, opts: RunRecipesOptions & { all?: bo
     }
   }
   if (!recipes.size) return { results: [], manual };
-  // Saved logins expire; an unattended refresh logs in again rather than failing on an old session.
-  rmSync(storePaths(store).auth, { recursive: true, force: true });
   const results = await runRecipes(store, [...recipes].sort(), opts);
   return { results, manual };
 }
