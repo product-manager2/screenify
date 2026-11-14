@@ -8,7 +8,7 @@ import type { Store } from './store.js';
 function flags(c: Capture, staleIds: Set<string>, config: Config): string {
   const f: string[] = [];
   if (staleIds.has(c.id)) f.push('STALE');
-  if (c.dirty) f.push('dirty tree');
+  if (c.dirty) f.push('sources uncommitted');
   if (config.defaultBranch && c.branch && c.branch !== config.defaultBranch) f.push(`branch ${c.branch}`);
   if (servedDiffers(c.servedCommit, c.commit)) f.push(`served ${short(c.servedCommit ?? null)}`);
   return f.join(', ');
@@ -25,7 +25,7 @@ function short(commit: string | null): string {
 
 /**
  * Renders INDEX.md: one page listing every feature with its screens and flows, their paths,
- * capture commit and flags (stale, dirty tree, off the default branch), then pending plan items.
+ * capture commit and flags (stale, sources uncommitted, off the default branch), then pending plan items.
  */
 export function renderIndex(store: Store, manifest: Manifest, plan: Plan, status: LibraryStatus, config: Config): string {
   const captures = Object.values(manifest.captures);

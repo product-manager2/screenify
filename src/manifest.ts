@@ -51,6 +51,8 @@ export interface Capture {
   planItem?: string;
   /** The agent's one line on what the image shows (a flow: its last frame, the result). */
   shows?: string;
+  /** A flow's one-line description from its recipe, kept so the flow can be recomposed. */
+  description?: string;
   /** SHA-256 of the image's pixels as filed (screens), used to catch two states that are the same image. */
   hash?: string;
   /** Commit the running app reported at `config.versionUrl` when captured; absent when none is configured. */

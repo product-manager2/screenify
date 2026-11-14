@@ -57,7 +57,9 @@ to six steps (create, edit, rename, delete, submit, invite), not whole-feature t
   the team would say it, never a URL segment or folder name such as "app" or "(main)".
 - "name" is the screen's name, or a verb-first flow name (create-task, rename-room).
 - "route" names params (/tasks/:id); "example" is a concrete path that opens with the seed data
-  (/tasks/1). A screen without its own URL takes the route and example of the page it opens from
+  (/tasks/1). When the app redirects a route to a longer path (/calendar to /calendar/2026/11),
+  "route" is the landing pattern (/calendar/:year/:month) and "example" the path a user opens
+  (/calendar), because capture checks the page against "route" after it lands. A screen without its own URL takes the route and example of the page it opens from
   (see below), so capture still checks where it lands.
 - Each state gets a one-line "how" the capture agent can follow without reading code.
 - "steps" outline a flow in plain words; "writes" is true when it creates, edits or deletes data.

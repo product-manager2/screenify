@@ -116,6 +116,31 @@ export function findPlanItem(plan: Plan, ref: string): PlanItem | undefined {
 
 const str = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
+const ITEM_KEYS = ['kind', 'platform', 'feature', 'name', 'route', 'example', 'states', 'start', 'steps', 'writes', 'sources', 'auth', 'requires', 'note'];
+/** Fields capture records; `plan show --json` prints them, so an import accepts and ignores them. */
+const CAPTURE_KEYS = ['id', 'status', 'captures', 'skippedStates', 'captureNote', 'coverage'];
+const STATE_KEYS = ['name', 'how', 'writes'];
+
+/** Problems for keys an item or its states do not take, naming where a misplaced key belongs. */
+function unknownKeys(raw: any, where: string): string[] {
+  const errors: string[] = [];
+  for (const k of Object.keys(raw)) {
+    if (ITEM_KEYS.includes(k) || CAPTURE_KEYS.includes(k)) continue;
+    errors.push(STATE_KEYS.includes(k) ? `${where}: unknown key "${k}"; it belongs on a state` : `${where}: unknown key "${k}"; an item takes ${ITEM_KEYS.join(', ')}`);
+  }
+  if (raw.kind === 'screen' && raw.writes !== undefined) errors.push(`${where}: "writes" on a screen belongs on the state that changes data or settings`);
+  if (Array.isArray(raw.states)) {
+    raw.states.forEach((st: any, n: number) => {
+      if (!st || typeof st !== 'object') return;
+      for (const k of Object.keys(st)) {
+        if (STATE_KEYS.includes(k)) continue;
+        errors.push(ITEM_KEYS.includes(k) ? `${where}: states[${n}] has unknown key "${k}"; it belongs on the item` : `${where}: states[${n}] has unknown key "${k}"; a state takes ${STATE_KEYS.join(', ')}`);
+      }
+    });
+  }
+  return errors;
+}
+
 /**
  * Validates one item as the discovery agent writes it (the shape `screenify discover` prints)
  * and returns the normalised item, or the problems found. Status and captures are not input.
@@ -123,6 +148,7 @@ const str = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '
 export function parsePlanItem(raw: any, where: string): { item?: PlanItem; errors: string[] } {
   const errors: string[] = [];
   if (!raw || typeof raw !== 'object') return { errors: [`${where}: must be an object`] };
+  errors.push(...unknownKeys(raw, where));
   const kind = raw.kind;
   if (kind !== 'screen' && kind !== 'flow') errors.push(`${where}: "kind" must be "screen" or "flow"`);
   for (const k of ['feature', 'name']) if (!str(raw[k])) errors.push(`${where}: "${k}" must be a non-empty string`);

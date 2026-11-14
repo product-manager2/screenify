@@ -155,6 +155,7 @@ export async function recordFlow(
     capturedAt: new Date().toISOString(),
     planItem: prov.planItem,
     shows: frames[frames.length - 1]?.shows,
+    description,
     servedCommit: prov.servedCommit,
   };
   writeFileAtomic(join(store.dir, capture.sidecar), flowSidecar(capture, frames.map((f) => f.text), description));
