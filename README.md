@@ -18,33 +18,39 @@ not match its neighbours.
 The alternative is for the agent to start the app, sign in, click to the right place and take a
 screenshot, every time it needs to look. That is slow, and most sessions skip it.
 
-Screenify does that work once, files the result, and keeps it current:
+Screenify does that work once, files the result, and keeps it current. What it changes for the
+agent (the first row is measured below; the rest is what the library is for, not yet measured):
 
 | | Without Screenify | With Screenify |
 | --- | --- | --- |
-| "What does the settings page look like?" | Reads the router, the page, its components and the locale files, then infers the layout | Opens one image and its text sidecar |
-| Building a new screen | Copies patterns it inferred from code; spacing, labels and defaults drift | Looks at the neighbouring screens first and matches them |
+| "What does the settings page look like?" *(measured)* | Reads the router, the page, its components and the locale files, then infers the layout | Opens one image and its text sidecar |
+| Building a new screen | Copies patterns it inferred from code; labels and defaults drift | Looks at the neighbouring screens first and matches them |
 | Mockups, docs, release notes | Draws from imagination | Works from real screens and real copy |
 | Suggesting features | Reasons about files | Sees the product a user sees, including empty and error states |
 | Finding where a label lives | Greps the code, guesses which screen renders it | Greps the sidecars; each names the image, the route and the source files |
 | After the code changes | Nothing tells it the picture in its head is out of date | Stale captures are flagged and re-captured from stored recipes, no model needed |
 
-### Measured once, on a real app
+### Measured on a real app
 
-We ran the same 20 questions about what the open-source notes app
-[Memos](https://github.com/usememos/memos) shows on screen, three times with only the code and
-three times with a Screenify library in the checkout. Same model, same prompt, blind grading.
+Twenty questions about what the open-source notes app [Memos](https://github.com/usememos/memos)
+shows on screen, answered three times each with only the code, with a Screenify library in the
+checkout, and with a running copy of the app the agent could browse itself. Same model (Claude
+Sonnet 5.5), same prompt, graded blind.
 
-| | Code only | Code + Screenify |
-| --- | --- | --- |
-| Correct answers | 55 / 60 (92%) | **60 / 60 (100%)** |
-| Time per run | 110 s | **30 s** |
-| Tool calls per run | 27 | **9** |
-| Tokens per run | 185k | **125k** |
+| | Code only | Code + Screenify | Browse it yourself |
+| --- | --- | --- | --- |
+| Correct answers | 52 / 60 (87%) | **60 / 60 (100%)** | 55 / 60 (92%) |
+| Cost per run, list price | $1.27 | **$0.40** | $0.52 |
+| Time per run | 110 s | **30 s** | 235 s |
 
-It is one small test on one tidy codebase, and the library itself took about 14 minutes of cheap
-model time to build. The questions, the answer key, every raw answer, the grades and the limits
-of the test are in [`benchmark/`](benchmark/).
+The scenario was chosen where screenshots should help most, on a small, tidy app. A second test,
+redrawing three screens as HTML, did **not** favour the library on looks: code-only pages copied the
+app's own styles and icons, while library-guided pages got every word and state right but drew
+rougher icons. The library costs about $1.67 to build once. Every run, the grades, the costs and
+the limits are in [`benchmark/`](benchmark/).
+
+Screenify files still images: the states a recipe can stop on (a page, an open menu, a dialog),
+not animations or transitions.
 
 ## What you get
 

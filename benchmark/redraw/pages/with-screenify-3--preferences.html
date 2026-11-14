@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Memos</title><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:#faf9f7;color:#1f1d17;font-size:14px;min-height:900px}
+.sb{position:fixed;left:0;top:0;bottom:0;width:256px;background:#f3f1ec;border-right:1px solid #e3e0d8;padding:0 12px}
+.brand{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 4px 0 8px}
+.brand b{font-family:Georgia,"Times New Roman",serif;font-size:19px;font-weight:700;margin-left:6px}
+.brand .l{display:flex;align-items:center}
+.logo{width:18px;height:24px;color:#2c4a7a}
+.av{width:20px;height:20px;border-radius:50%;background:#d4547c}
+.chev{color:#999;font-size:10px;margin-left:8px}
+.nb{width:28px;height:28px;border:1px solid #d9d6ce;border-radius:6px;background:#faf9f7;display:flex;align-items:center;justify-content:center;color:#444}
+.nav{display:flex;align-items:center;height:28px}
+.nav .t{display:flex;align-items:center;gap:6px;padding:0 8px;height:28px;border-radius:6px;font-size:13px}
+.nav .t.on{background:#e6e3d8}
+.nav .i{width:32px;text-align:center;color:#666;font-size:14px}
+.nav .sp{flex:1}
+hr{border:0;border-top:1px solid #e3e0d8;margin:12px 0 0}
+.lbl{font-size:11px;letter-spacing:.04em;color:#8b887f;text-transform:uppercase;padding:0 8px;margin:14px 0 6px}
+.it{display:flex;align-items:center;gap:10px;height:30px;padding:0 8px;border-radius:6px;font-size:13px;color:#3a382f}
+.it.on{background:#e6e3d8;font-weight:500;color:#1f1d17}
+.it .ic{width:16px;color:#777;font-size:13px;text-align:center}
+.it .ex{margin-left:auto;color:#aaa;font-size:11px}
+.ban{position:absolute;left:256px;right:0;top:0;height:37px;background:#f3f1ec;border-bottom:1px solid #e3e0d8;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px}
+.ban b{font-weight:500}.ban span{color:#666}.ban a{color:#2c5282;text-decoration:none}
+.main{margin-left:256px;padding-top:37px}
+
+.w{width:848px;margin:0 auto;padding:44px 0 60px}
+h3{font-size:18px;font-weight:500;padding-bottom:22px;border-bottom:1px solid #e3e0d8;margin-top:6px}
+h4{font-size:14px;font-weight:500;margin-top:22px}
+.d{font-size:12px;color:#666;margin-top:8px}
+.sep{border-top:1px solid #e3e0d8;margin-top:21px}
+.card{border:1px solid #e3e0d8;border-radius:8px;margin-top:11px;background:#faf9f7}
+.row{display:flex;align-items:center;justify-content:space-between;padding:12px;min-height:68px;gap:20px}
+.row+.row{border-top:1px solid #e3e0d8}
+.row .n{font-size:14px;font-weight:500}.row .s{font-size:12px;color:#666;margin-top:9px;line-height:20px}
+.sel{border:1px solid #d9d6ce;border-radius:6px;height:32px;padding:0 10px;display:flex;align-items:center;gap:8px;font-size:14px;white-space:nowrap}
+.sel i{font-style:normal;color:#999;font-size:11px}
+.sw{width:32px;height:18px;border-radius:9px;background:#dcdad4;position:relative;flex:none}
+.sw:after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 1px #888}
+.sw.on{background:#2c4a7a}.sw.on:after{left:16px}
+</style></head><body><div class="sb"><div class="brand"><div class="l"><svg class="logo" viewBox="0 0 18 24"><path d="M9 2c3 1 4 4 3 7l3 5-3 1 2 6-5-3-4 4 1-6-3-2 4-3c-1-4 0-8 2-9z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><b>Memos</b><span class="chev">&#8661;</span></div><div class="nb">&#9998;</div></div><div class="nav"><div class="t"><span style="color:#666">|||\</span> Timeline</div><span class="i">&#9638;</span><span class="i">&#9636;</span><span class="i">&#8855;</span><span class="sp"></span><span class="i">&#9906;</span></div><hr><div class="lbl">Basic</div><div class="it"><span class="ic">&#9898;</span>My Account</div><div class="it"><span class="ic">&#9671;</span>Spaces</div><div class="it"><span class="ic">&#9901;</span>Access Tokens</div><div class="it on"><span class="ic">&#9881;</span>Preferences</div><div class="it"><span class="ic">&#9998;</span>Editor</div><div class="it"><span class="ic">&#9874;</span>Webhooks</div><div class="it"><span class="ic">&#9873;</span>Tags</div><div class="it"><span class="ic">&#8646;</span>Export &amp; Import</div></div><div class="ban"><b>Memos demo</b><span>Feel free to explore! This demo is reset periodically.</span><a href="#">Deploy your own Memos</a></div><div class="main"><div class="w"><h3>Preferences</h3>
+<h4>Appearance</h4><div class="d">Choose how the app looks and which language it uses for your account.</div>
+<div class="card"><div class="row"><div><div class="n">Language</div><div class="s">Updates the interface language immediately and saves it to your account.</div></div><div class="sel">&#127760; English <i>&#8964;</i></div></div><div class="row"><div><div class="n">Theme</div><div class="s">Applies the selected theme immediately on this device.</div></div><div class="sel">Sync with system <i>&#8964;</i></div></div></div>
+<div class="sep"></div><h4>Memo defaults</h4><div class="d">Set the defaults used when composing new memos.</div>
+<div class="card"><div class="row"><div><div class="n">Default memo visibility</div><div class="s">Visibility applied to newly created memos unless changed in the editor.</div></div><div class="sel">&#128274; Private <i>&#8964;</i></div></div></div>
+<div class="sep"></div><h4>Uploads &amp; privacy</h4><div class="d">Control privacy-sensitive information submitted with uploaded media.</div>
+<div class="card"><div class="row"><div><div class="n">Save media metadata</div><div class="s">For future uploads, save available camera, capture time, location, image dimensions, and basic video details. Anyone who can view the attachment can receive this metadata. Existing attachments are unchanged.</div></div><div class="sw"></div></div></div>
+<div class="sep"></div><h4>This device</h4><div class="d">Reading and editing choices kept in this browser. They are not saved to your account.</div>
+<div class="card"><div class="row"><div><div class="n">Link preview</div><div class="s">Show a preview card under bare links wherever memos are displayed.</div></div><div class="sw on"></div></div><div class="row"><div><div class="n">Double-click to edit</div><div class="s">Open your own memos in the editor by double-clicking them.</div></div><div class="sw"></div></div></div></div></div></body></html>

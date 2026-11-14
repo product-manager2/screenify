@@ -1,0 +1,22 @@
+{
+"1":"Welcome back.",
+"2":"A language selector showing \"English\" (globe icon) and a theme selector showing \"System\" (monitor icon).",
+"3":"\"Don't have an account yet?\" followed by a \"Sign up\" link.",
+"4":"Group heading \"BASIC\"; links in order: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import.",
+"5":"Appearance; Memo defaults; Uploads & privacy; This device.",
+"6":"Save media metadata: off; Link preview: on; Double-click to edit: off.",
+"7":"Theme shows \"Sync with system\"; Default memo visibility shows \"Private\" (Language selector shows English).",
+"8":"Any thoughts...",
+"9":"Left: a \"+\" (add/insert) button, then a \"Private\" visibility dropdown with lock icon; far right: a (disabled, greyed) \"Save\" button.",
+"10":"Top: user menu (avatar + username \"bench\" with a chevron) and a compose/new-memo icon button at right; below it the navigation row (Timeline dropdown plus icons); then a month calendar (November 2026 with prev/next arrows, weekday headers, day grid with a dot on days having memos); then a VIEWS section with a \"Create view\" button. No tag list appears for an account with no tags.",
+"11":"Only Timeline (a dropdown button) shows a text label; Calendar, Map, Attachments and Search are icon-only.",
+"12":"\"Memos demo — Feel free to explore! This demo is reset periodically.\" plus a \"Deploy your own Memos\" link; a thin banner strip across the top of the main content area (to the right of the sidebar), centered.",
+"13":"Sidebar INBOX group with All, Unread, Archived; the page shows heading \"Inbox\" and \"No data found.\"",
+"14":"Heading \"Archived\" with the text \"No data found.\"",
+"15":"\"The page you are looking for can't be found.\" with a large \"404\".",
+"16":"Official Website (The project homepage); Documents (Deploy, configure, and use Memos); API Docs (REST and gRPC reference); GitHub Repo (Source, issues, and releases); Web Clipper (Chrome + Firefox); Sponsor Memos (Support the project on GitHub).",
+"17":"Account Information (@username, Edit, Change password); Statistics (attachment storage); Usage limits (memos, storage, memo content, largest file); SSO Accounts (provider table, \"No SSO found.\"); Danger area (Delete account).",
+"18":"Top-left: the date/time (e.g. \"Today, 10:42\"); top-right: a visibility lock icon and a three-dot (more) menu.",
+"19":"As a small rounded pill/chip with a blue outline and tinted background, text like #project (hash included), inline within the text.",
+"20":"Each row has a hash (#) icon (or chevron on hover/for parents with sub-tags), the tag name (nested tags shown as path segments separated by /), and a usage count at the right end."
+}

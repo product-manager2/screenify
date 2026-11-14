@@ -1,0 +1,23 @@
+{
+"1":"\"Welcome back.\" (muted subtitle)",
+"2":"A language selector showing \"English\" (globe icon) and a theme selector showing \"System\" (monitor icon), side by side at the bottom center",
+"3":"\"Don't have an account yet?\" followed by a \"Sign up\" link",
+"4":"Group heading \"BASIC\"; links: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import",
+"5":"Appearance, Memo defaults, Uploads & privacy, This device (under the page title \"Preferences\")",
+"6":"Save media metadata: off; Link preview: on; Double-click to edit: off",
+"7":"Theme shows \"Sync with system\"; Default memo visibility shows \"Private\"",
+"8":"Any thoughts...",
+"9":"A \"+\" button (add/insert menu) at left, a visibility selector showing a lock icon and \"Private\" with dropdown chevron, then a (disabled, greyed) \"Save\" button at far right",
+"10":"Top: user/workspace menu (avatar + username \"bench\" with chevron) and a new-memo (pencil) button; below it the nav row; then a month calendar (November 2026 with prev/next arrows and weekday letters); then a VIEWS section with \"Create view\"; then a TAGS section (heading with a ... menu button) listing tags (only appears once memos have tags)",
+"11":"Only \"Timeline\" shows a text label (with a dropdown chevron, highlighted); Calendar, Map, Attachments and Search are icon-only",
+"12":"\"Memos demo\" (bold) followed by \"Feel free to explore! This demo is reset periodically.\" and a blue link \"Deploy your own Memos\"; it is a banner strip across the very top of the page, centered",
+"13":"Sidebar heading INBOX with filters All, Unread, Archived; empty page shows title \"Inbox\" and \"No data found.\"",
+"14":"Title \"Archived\" with the text \"No data found.\"",
+"15":"\"The page you are looking for can't be found.\" above a large \"404\"",
+"16":"Official Website (The project homepage), Documents (Deploy, configure, and use Memos), API Docs (REST and gRPC reference), GitHub Repo (Source, issues, and releases), Web Clipper (Chrome + Firefox), Sponsor Memos (Support the project on GitHub)",
+"17":"Account Information (avatar/@bench with Edit and Change password buttons), Statistics (attachment storage, usage limits: memos, storage, memo content, largest file), SSO Accounts (provider/account table, 'No SSO found.'), Danger area (Delete account)",
+"18":"Top-left: relative time/timestamp (e.g. \"now\") with a small \"New\" badge for fresh memos; top-right: a three-dot (vertical ellipsis) action menu",
+"19":"As a rounded pill/chip with a blue outline and tinted text, showing \"#books\" inline",
+"20":"A hash (#) icon, the tag name (e.g. \"books\"), and a memo count on the right (e.g. 1); no count/hash shown beyond that",
+"_note":"Q18 'New' badge seen only on a just-created memo; Q20 verified on the live app with one tag"
+}
