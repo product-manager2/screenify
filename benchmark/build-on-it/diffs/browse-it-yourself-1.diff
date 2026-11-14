@@ -1,0 +1,1338 @@
+diff --git a/web/src/components/MemoActionMenu/MemoActionMenu.tsx b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+index 035647c..bc87769 100644
+--- a/web/src/components/MemoActionMenu/MemoActionMenu.tsx
++++ b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+@@ -6,6 +6,7 @@ import {
+   BookmarkPlusIcon,
+   CheckCheckIcon,
+   CopyIcon,
++  CopyPlusIcon,
+   Edit3Icon,
+   FileTextIcon,
+   LinkIcon,
+@@ -36,7 +37,7 @@ import type { MemoActionMenuProps } from "./types";
+ 
+ /**
+  * The memo's action menu, grouped by what each action does to the card:
+- * write on it (Edit, the task action), place it (Pin, Archive), reach it beyond
++ * write on it (Edit, the task action), place it (Duplicate, Pin, Archive), reach it beyond
+  * the feed (Open its page, Copy its link or content), then Delete last.
+  * A memo's Space is changed in the editor, not here. An archived memo offers
+  * only Restore and Delete, and a viewer only Open and Copy.
+@@ -62,6 +63,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemoClick,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+@@ -155,10 +157,14 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+             </DropdownMenuItem>
+           ))}
+ 
+-        {/* A comment has no place of its own to pin or archive; it lives under its parent. */}
++        {/* A comment has no place of its own to duplicate, pin or archive; it lives under its parent. */}
+         {!isComment && (
+           <>
+             <DropdownMenuSeparator />
++            <DropdownMenuItem onClick={handleDuplicateMemoClick}>
++              <CopyPlusIcon />
++              {t("memo.duplicate")}
++            </DropdownMenuItem>
+             <DropdownMenuItem onClick={handleTogglePinMemoBtnClick}>
+               {memo.pinned ? <BookmarkMinusIcon /> : <BookmarkPlusIcon />}
+               {memo.pinned ? t("common.unpin") : t("common.pin")}
+diff --git a/web/src/components/MemoActionMenu/hooks.ts b/web/src/components/MemoActionMenu/hooks.ts
+index 38344a6..586d295 100644
+--- a/web/src/components/MemoActionMenu/hooks.ts
++++ b/web/src/components/MemoActionMenu/hooks.ts
+@@ -1,17 +1,19 @@
++import { create } from "@bufbuild/protobuf";
+ import { useQueryClient } from "@tanstack/react-query";
+ import copy from "copy-to-clipboard";
+ import { useCallback } from "react";
+ import toast from "react-hot-toast";
+ import { useLocation } from "react-router-dom";
+ import { useInstance } from "@/contexts/InstanceContext";
+-import { memoKeys, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
++import { useNewMemo } from "@/contexts/NewMemoContext";
++import { memoKeys, useCreateMemo, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
+ import useNavigateTo from "@/hooks/useNavigateTo";
+ import { userKeys } from "@/hooks/useUserQueries";
+ import { handleError } from "@/lib/error";
+ import { extractMemoIdFromName } from "@/lib/resource-names";
+ import { ROUTES } from "@/router/routes";
+ import { State } from "@/types/proto/api/common_pb";
+-import type { Memo } from "@/types/proto/api/memo_service_pb";
++import { type Memo, MemoSchema } from "@/types/proto/api/memo_service_pb";
+ import { useTranslate } from "@/utils/i18n";
+ import { checkAllTasks, uncheckAllTasks } from "@/utils/markdown-task-actions";
+ import { isMemoDetailPath } from "../MemoView/navigation";
+@@ -30,7 +32,9 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+   const queryClient = useQueryClient();
+   const { profile } = useInstance();
+   const { mutateAsync: updateMemo } = useUpdateMemo();
++  const { mutateAsync: createMemo } = useCreateMemo();
+   const { mutateAsync: deleteMemo } = useDeleteMemo();
++  const { markNewMemo } = useNewMemo();
+   const isInMemoDetailPage = isMemoDetailPath(location.pathname, memo.name);
+ 
+   const memoUpdatedCallback = useCallback(() => {
+@@ -125,6 +129,24 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     toast.success(t("message.succeed-copy-content"));
+   }, [memo.content, t]);
+ 
++  // Attachments belong to one memo each, so the copy carries the text, audience and place only.
++  const handleDuplicateMemoClick = useCallback(async () => {
++    try {
++      const duplicate = await createMemo({
++        memo: create(MemoSchema, {
++          content: memo.content,
++          visibility: memo.visibility,
++          space: memo.space,
++          location: memo.location,
++        }),
++      });
++      markNewMemo(duplicate.name);
++      toast.success(t("message.duplicated-successfully"));
++    } catch (error: unknown) {
++      handleError(error, toast.error, { context: "Duplicate memo", fallbackMessage: "An error occurred" });
++    }
++  }, [createMemo, markNewMemo, memo.content, memo.location, memo.space, memo.visibility, t]);
++
+   const handleCheckAllTaskListItemsClick = useCallback(async () => {
+     await updateMemoContent(checkAllTasks(memo.content), "Check memo task list items");
+   }, [memo.content, updateMemoContent]);
+@@ -162,6 +184,7 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemoClick,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+diff --git a/web/src/components/MemoView/MemoViewContext.tsx b/web/src/components/MemoView/MemoViewContext.tsx
+index 250c89d..00e4ea9 100644
+--- a/web/src/components/MemoView/MemoViewContext.tsx
++++ b/web/src/components/MemoView/MemoViewContext.tsx
+@@ -52,9 +52,9 @@ export const useMemoViewDerived = () => {
+ 
+   const createTime = memo.createTime ? timestampDate(memo.createTime) : undefined;
+   const updateTime = memo.updateTime ? timestampDate(memo.updateTime) : undefined;
++  const isEdited = !!createTime && !!updateTime && updateTime.getTime() !== createTime.getTime();
+   const displayTime = timeBasis === "update_time" ? updateTime : createTime;
+-  const isDisplayingUpdatedTime =
+-    timeBasis === "update_time" && !!createTime && !!updateTime && updateTime.getTime() !== createTime.getTime();
++  const isDisplayingUpdatedTime = timeBasis === "update_time" && isEdited;
+   const relativeTimeFormat: "datetime" | "auto" =
+     displayTime && Date.now() - displayTime.getTime() > RELATIVE_TIME_THRESHOLD_MS ? "datetime" : "auto";
+ 
+@@ -65,6 +65,7 @@ export const useMemoViewDerived = () => {
+     commentAmount,
+     createTime,
+     updateTime,
++    isEdited,
+     displayTime,
+     isDisplayingUpdatedTime,
+     relativeTimeFormat,
+diff --git a/web/src/components/MemoView/components/MemoHeader.tsx b/web/src/components/MemoView/components/MemoHeader.tsx
+index a4b73fb..89cdfb1 100644
+--- a/web/src/components/MemoView/components/MemoHeader.tsx
++++ b/web/src/components/MemoView/components/MemoHeader.tsx
+@@ -29,7 +29,14 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+ 
+   const { memo, creator, currentUser, parentPage, isArchived, readonly, isEditing, openEditor } = useMemoViewContext();
+   const location = useLocation();
+-  const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, relativeTimeFormat } = useMemoViewDerived();
++  const {
++    createTime,
++    updateTime,
++    isEdited,
++    displayTime: memoDisplayTime,
++    isDisplayingUpdatedTime,
++    relativeTimeFormat,
++  } = useMemoViewDerived();
+   const { newMemoName } = useNewMemo();
+   const visibilityOption = getVisibilityOption(memo.visibility);
+ 
+@@ -49,10 +56,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+   );
+   const timeTooltip = {
+     createdAt: createTime ? `${t("common.created-at")}: ${createTime.toLocaleString(i18n.language)}` : undefined,
+-    updatedAt:
+-      updateTime && (!createTime || updateTime.getTime() !== createTime.getTime())
+-        ? `${t("common.last-updated-at")}: ${updateTime.toLocaleString(i18n.language)}`
+-        : undefined,
++    updatedAt: updateTime && isEdited ? `${t("common.last-updated-at")}: ${updateTime.toLocaleString(i18n.language)}` : undefined,
+   };
+   const spaceMetadata = showSpace && memo.space ? <MemoSpaceBadge spaceName={memo.space} /> : null;
+   const showsCreator = Boolean(showCreator && creator);
+@@ -89,6 +93,8 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+             parentPage={parentPage}
+             isCurrentPage={isMemoDetailPath(location.pathname, memo.name)}
+           />
++          {/* "Last updated at" already says so when the card shows the update time. */}
++          {isEdited && !isDisplayingUpdatedTime && <EditedLabel timeTooltip={timeTooltip} />}
+           {spaceMetadata}
+         </div>
+         {isNew && <NewBadge />}
+@@ -126,6 +132,16 @@ const NewBadge = () => {
+   );
+ };
+ 
++/** Marks a memo changed after it was created; the tooltip gives both times. */
++const EditedLabel: React.FC<{ timeTooltip: TimeTooltipContent }> = ({ timeTooltip }) => {
++  const t = useTranslate();
++  return (
++    <TimeTooltip content={timeTooltip}>
++      <span className="shrink-0 whitespace-nowrap text-ui text-muted-foreground select-none">{t("memo.edited")}</span>
++    </TimeTooltip>
++  );
++};
++
+ /**
+  * The author on one line with the time: a 20px avatar in a 20px slot, then the name in
+  * medium 13px foreground ink. It is the identity, so it carries the weight; the time after
+diff --git a/web/src/locales/ar.json b/web/src/locales/ar.json
+index 240faf9..7072bc4 100644
+--- a/web/src/locales/ar.json
++++ b/web/src/locales/ar.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "هل أنت متأكد أنك تريد حذف هذه المذكرة؟\n\nهذا الإجراء لا رجعة فيه",
+     "delete-confirm-description": "هذا الإجراء لا رجعة فيه. ستتم إزالة المرفقات والروابط والمراجع أيضًا.",
+     "direction": "الاتجاه",
++    "duplicate": "تكرار",
++    "edited": "تم التعديل",
+     "filters": {
+       "has-attachments": "يحتوي على مرفقات",
+       "has-code": "يحتوي على كود",
+@@ -367,6 +369,7 @@
+     "copied": "تم النسخ",
+     "deleted-successfully": "تم الحذف بنجاح",
+     "description-is-required": "الوصف مطلوب",
++    "duplicated-successfully": "تم تكرار المذكرة بنجاح",
+     "fill-all": "يرجى ملء جميع الحقول.",
+     "fill-all-required-fields": "يرجى ملء جميع الحقول المطلوبة",
+     "new-password-not-match": "كلمات المرور الجديدة غير متطابقة.",
+diff --git a/web/src/locales/az.json b/web/src/locales/az.json
+index 8fa87e3..f5f1047 100644
+--- a/web/src/locales/az.json
++++ b/web/src/locales/az.json
+@@ -392,6 +392,8 @@
+     "delete-confirm": "Bu qeydi silmək istədiyinizə əminsiniz?",
+     "delete-confirm-description": "Bu əməliyyat geri qaytarıla bilməz. Qoşmalar, keçidlər və istinadlar da çıxarılacaq.",
+     "direction": "İstiqamət",
++    "duplicate": "Dublikat et",
++    "edited": "Redaktə olunub",
+     "filters": {
+       "has-attachments": "Qoşma var",
+       "has-code": "Kod var",
+@@ -469,6 +471,7 @@
+     "copied": "Kopyalandı",
+     "deleted-successfully": "Qeyd uğurla silindi",
+     "description-is-required": "Təsvir tələb olunur",
++    "duplicated-successfully": "Qeyd uğurla dublikat edildi",
+     "fill-all": "Zəhmət olmasa bütün sahələri doldurun.",
+     "fill-all-required-fields": "Zəhmət olmasa tələb olunan bütün sahələri doldurun",
+     "new-password-not-match": "Yeni parollar uyğun gəlmir.",
+diff --git a/web/src/locales/bg.json b/web/src/locales/bg.json
+index d5fb513..a933dd1 100644
+--- a/web/src/locales/bg.json
++++ b/web/src/locales/bg.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Сигурни ли сте, че искате да изтриете тази бележка?",
+     "delete-confirm-description": "Това действие е необратимо. Прикачените файлове, връзките и препратките също ще бъдат премахнати.",
+     "direction": "Посока",
++    "duplicate": "Дублиране",
++    "edited": "Редактирана",
+     "filters": {
+       "has-attachments": "има прикачени файлове",
+       "has-code": "hasCode",
+@@ -410,6 +412,7 @@
+     "copied": "Копирано",
+     "deleted-successfully": "Бележката е изтрита успешно",
+     "description-is-required": "Изисква се описание",
++    "duplicated-successfully": "Бележката е дублирана успешно",
+     "fill-all": "Моля, попълнете всички полета.",
+     "fill-all-required-fields": "Моля, попълнете всички задължителни полета",
+     "new-password-not-match": "Новите пароли не съвпадат.",
+diff --git a/web/src/locales/ca.json b/web/src/locales/ca.json
+index ae9d181..f5e40cc 100644
+--- a/web/src/locales/ca.json
++++ b/web/src/locales/ca.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Estàs segur que vols esborrar aquesta nota? AQUESTA ACCIÓ ÉS IRREVERSIBLE",
+     "delete-confirm-description": "Aquesta acció és irreversible. Els adjunts, enllaços i referències també s'eliminaran.",
+     "direction": "Direcció",
++    "duplicate": "Duplica",
++    "edited": "Editada",
+     "filters": {
+       "has-attachments": "té adjunts",
+       "has-code": "téCodi",
+@@ -372,6 +374,7 @@
+     "copied": "Copiat",
+     "deleted-successfully": "Eliminat correctament",
+     "description-is-required": "La descripció és obligatòria",
++    "duplicated-successfully": "Nota duplicada correctament",
+     "fill-all": "Si us plau, omple tots els camps.",
+     "fill-all-required-fields": "Si us plau, omple tots els camps obligatoris",
+     "new-password-not-match": "Les noves contrasenyes no coincideixen.",
+diff --git a/web/src/locales/cs.json b/web/src/locales/cs.json
+index bba2db8..39b6cf2 100644
+--- a/web/src/locales/cs.json
++++ b/web/src/locales/cs.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Opravdu chcete smazat tuto poznámku?",
+     "delete-confirm-description": "Tato akce je nevratná. Přílohy, odkazy a reference budou také odstraněny.",
+     "direction": "Směr",
++    "duplicate": "Duplikovat",
++    "edited": "Upraveno",
+     "filters": {
+       "has-attachments": "má přílohy",
+       "has-code": "maKod",
+@@ -372,6 +374,7 @@
+     "copied": "Zkopírováno",
+     "deleted-successfully": "Úspěšně smazáno",
+     "description-is-required": "Popis je vyžadován",
++    "duplicated-successfully": "Poznámka byla úspěšně duplikována",
+     "fill-all": "Vyplňte prosím všechna pole",
+     "fill-all-required-fields": "Vyplňte prosím všechny požadované údaje",
+     "new-password-not-match": "Nová hesla nesouhlasí.",
+diff --git a/web/src/locales/da.json b/web/src/locales/da.json
+index 5abaea2..7aeaadc 100644
+--- a/web/src/locales/da.json
++++ b/web/src/locales/da.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Er du sikker på, at du vil slette dette notat?",
+     "delete-confirm-description": "Denne handling er irreversibel. Vedhæftede filer, links og referencer vil også blive fjernet.",
+     "direction": "Retning",
++    "duplicate": "Dupliker",
++    "edited": "Redigeret",
+     "filters": {
+       "has-attachments": "har vedhæftninger",
+       "has-code": "hasCode",
+@@ -410,6 +412,7 @@
+     "copied": "Kopieret",
+     "deleted-successfully": "Notatet blev slettet",
+     "description-is-required": "Beskrivelse er påkrævet",
++    "duplicated-successfully": "Notatet er duplikeret",
+     "fill-all": "Udfyld venligst alle felter.",
+     "fill-all-required-fields": "Udfyld venligst alle obligatoriske felter",
+     "new-password-not-match": "Nye adgangskoder stemmer ikke overens.",
+diff --git a/web/src/locales/de.json b/web/src/locales/de.json
+index 6c9dce0..b871f67 100644
+--- a/web/src/locales/de.json
++++ b/web/src/locales/de.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Bist du sicher, dass du diese Notiz löschen möchtest?\n\nDIESE AKTION KANN NICHT RÜCKGÄNGIG GEMACHT WERDEN",
+     "delete-confirm-description": "Dieser Vorgang ist nicht rückgängig zu machen. Anhänge, Links und Verknüpfungen werden ebenfalls gelöscht.",
+     "direction": "Richtung",
++    "duplicate": "Duplizieren",
++    "edited": "Bearbeitet",
+     "filters": {
+       "has-attachments": "hat Anhänge",
+       "has-code": "hatCode",
+@@ -372,6 +374,7 @@
+     "copied": "Kopiert",
+     "deleted-successfully": "Erfolgreich gelöscht",
+     "description-is-required": "Beschreibung ist erforderlich",
++    "duplicated-successfully": "Notiz erfolgreich dupliziert",
+     "fill-all": "Bitte alle Felder ausfüllen.",
+     "fill-all-required-fields": "Bitte alle Pflichtfelder ausfüllen",
+     "new-password-not-match": "Neue Passwörter stimmen nicht überein.",
+diff --git a/web/src/locales/el.json b/web/src/locales/el.json
+index c1d0861..fe0ccf5 100644
+--- a/web/src/locales/el.json
++++ b/web/src/locales/el.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτό το σημείωμα;",
+     "delete-confirm-description": "Αυτή η ενέργεια είναι μη αναστρέψιμη. Τα συνημμένα, οι σύνδεσμοι και οι αναφορές θα αφαιρεθούν επίσης.",
+     "direction": "Κατεύθυνση",
++    "duplicate": "Αντιγραφή σημείωσης",
++    "edited": "Επεξεργασμένο",
+     "filters": {
+       "has-attachments": "έχει συνημμένα",
+       "has-code": "έχει Κώδικα",
+@@ -410,6 +412,7 @@
+     "copied": "Αντιγράφηκε",
+     "deleted-successfully": "Το σημείωμα διαγράφηκε με επιτυχία",
+     "description-is-required": "Απαιτείται περιγραφή",
++    "duplicated-successfully": "Η σημείωση αντιγράφηκε επιτυχώς",
+     "fill-all": "Παρακαλούμε συμπληρώστε όλα τα πεδία.",
+     "fill-all-required-fields": "Συμπληρώστε όλα τα υποχρεωτικά πεδία",
+     "new-password-not-match": "Οι νέοι κωδικοί πρόσβασης δεν ταιριάζουν.",
+diff --git a/web/src/locales/en-GB.json b/web/src/locales/en-GB.json
+index a64e0cf..0f75c70 100644
+--- a/web/src/locales/en-GB.json
++++ b/web/src/locales/en-GB.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Are you sure you want to delete this memo?",
+     "delete-confirm-description": "This action is irreversible. Attachments, links, and references will also be removed.",
+     "direction": "Direction",
++    "duplicate": "Duplicate",
++    "edited": "Edited",
+     "filters": {
+       "has-attachments": "hasAttachments",
+       "has-code": "hasCode",
+@@ -372,6 +374,7 @@
+     "copied": "Copied",
+     "deleted-successfully": "Memo deleted successfully",
+     "description-is-required": "Description is required",
++    "duplicated-successfully": "Memo duplicated successfully",
+     "fill-all": "Please fill in all fields.",
+     "fill-all-required-fields": "Please fill all required fields",
+     "new-password-not-match": "New passwords do not match.",
+diff --git a/web/src/locales/en.json b/web/src/locales/en.json
+index 9e9eeca..4c20108 100644
+--- a/web/src/locales/en.json
++++ b/web/src/locales/en.json
+@@ -392,6 +392,8 @@
+     "delete-confirm": "Are you sure you want to delete this memo?",
+     "delete-confirm-description": "This action is irreversible. Attachments, links, and references will also be removed.",
+     "direction": "Direction",
++    "duplicate": "Duplicate",
++    "edited": "Edited",
+     "filters": {
+       "has-attachments": "hasAttachments",
+       "has-code": "hasCode",
+@@ -469,6 +471,7 @@
+     "copied": "Copied",
+     "deleted-successfully": "Memo deleted successfully",
+     "description-is-required": "Description is required",
++    "duplicated-successfully": "Memo duplicated successfully",
+     "fill-all": "Please fill in all fields.",
+     "fill-all-required-fields": "Please fill all required fields",
+     "new-password-not-match": "New passwords do not match.",
+diff --git a/web/src/locales/es.json b/web/src/locales/es.json
+index bfdbdf0..4ce22f0 100644
+--- a/web/src/locales/es.json
++++ b/web/src/locales/es.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "¿Estás seguro de que quieres eliminar este memo?",
+     "delete-confirm-description": "Esta acción es irreversible. Los adjuntos, enlaces y referencias también se eliminarán.",
+     "direction": "Dirección",
++    "duplicate": "Duplicar",
++    "edited": "Editada",
+     "filters": {
+       "has-attachments": "tiene adjuntos",
+       "has-code": "tieneCódigo",
+@@ -372,6 +374,7 @@
+     "copied": "Copiado",
+     "deleted-successfully": "Eliminado correctamente",
+     "description-is-required": "La descripción es obligatoria",
++    "duplicated-successfully": "Nota duplicada correctamente",
+     "fill-all": "Por favor rellena todos los campos.",
+     "fill-all-required-fields": "Por favor rellena todos los campos obligatorios",
+     "new-password-not-match": "Las nuevas contraseñas no coinciden.",
+diff --git a/web/src/locales/et.json b/web/src/locales/et.json
+index 48e1d3a..2198e04 100644
+--- a/web/src/locales/et.json
++++ b/web/src/locales/et.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Kas olete kindel, et soovite selle memo kustutada?",
+     "delete-confirm-description": "See toiming on pöördumatu. Samuti eemaldatakse manused, lingid ja viited.",
+     "direction": "Suund",
++    "duplicate": "Dubleeri",
++    "edited": "Muudetud",
+     "filters": {
+       "has-attachments": "on manuseid",
+       "has-code": "hasCode",
+@@ -410,6 +412,7 @@
+     "copied": "Kopeeritud",
+     "deleted-successfully": "Memo kustutamine õnnestus",
+     "description-is-required": "Kirjeldus on nõutav",
++    "duplicated-successfully": "Märge dubleeriti edukalt",
+     "fill-all": "Palun täitke kõik väljad.",
+     "fill-all-required-fields": "Palun täitke kõik nõutud väljad",
+     "new-password-not-match": "Uued paroolid ei ühti.",
+diff --git a/web/src/locales/fa.json b/web/src/locales/fa.json
+index a0c08af..bc10b63 100644
+--- a/web/src/locales/fa.json
++++ b/web/src/locales/fa.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "آیا مطمئن هستید که می‌خواهید این یادداشت را حذف کنید؟",
+     "delete-confirm-description": "این عمل غیرقابل بازگشت است. پیوست‌ها، پیوندها و ارجاعات نیز حذف خواهند شد.",
+     "direction": "جهت",
++    "duplicate": "تکثیر",
++    "edited": "ویرایش‌شده",
+     "filters": {
+       "has-attachments": "دارای پیوست",
+       "has-code": "دارای کد",
+@@ -367,6 +369,7 @@
+     "copied": "کپی شد",
+     "deleted-successfully": "با موفقیت حذف شد",
+     "description-is-required": "توضیحات اجباری است",
++    "duplicated-successfully": "یادداشت با موفقیت تکثیر شد",
+     "fill-all": "لطفاً همه فیلدها را پر کنید.",
+     "fill-all-required-fields": "لطفا همه فیلدهای ضروری را پر کنید",
+     "new-password-not-match": "گذرواژه‌های جدید مطابقت ندارند.",
+diff --git a/web/src/locales/fi.json b/web/src/locales/fi.json
+index 11ba57e..c234eb6 100644
+--- a/web/src/locales/fi.json
++++ b/web/src/locales/fi.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Haluatko varmasti poistaa tämän muistion?",
+     "delete-confirm-description": "Tämä toimenpide on peruuttamaton. Myös liitteet, linkit ja viittaukset poistetaan.",
+     "direction": "Suunta",
++    "duplicate": "Monista",
++    "edited": "Muokattu",
+     "filters": {
+       "has-attachments": "on liitteitä",
+       "has-code": "hasCode",
+@@ -410,6 +412,7 @@
+     "copied": "Kopioitu",
+     "deleted-successfully": "Muistio poistettiin onnistuneesti",
+     "description-is-required": "Kuvaus vaaditaan",
++    "duplicated-successfully": "Muistio monistettu onnistuneesti",
+     "fill-all": "Täytä kaikki kentät.",
+     "fill-all-required-fields": "Täytä kaikki vaaditut kentät",
+     "new-password-not-match": "Uudet salasanat eivät täsmää.",
+diff --git a/web/src/locales/fr.json b/web/src/locales/fr.json
+index 4805fa0..45c1e57 100644
+--- a/web/src/locales/fr.json
++++ b/web/src/locales/fr.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Êtes-vous sûr de vouloir supprimer cette note ? CETTE ACTION EST IRRÉVERSIBLE",
+     "delete-confirm-description": "Cette action est irréversible. Les pièces jointes, liens et références seront également supprimés.",
+     "direction": "Direction",
++    "duplicate": "Dupliquer",
++    "edited": "Modifié",
+     "filters": {
+       "has-attachments": "a des pièces jointes",
+       "has-code": "aCode",
+@@ -372,6 +374,7 @@
+     "copied": "Copié",
+     "deleted-successfully": "Supprimé avec succès",
+     "description-is-required": "La description est requise",
++    "duplicated-successfully": "Mémo dupliqué avec succès",
+     "fill-all": "Veuillez remplir tous les champs.",
+     "fill-all-required-fields": "Veuillez remplir tous les champs obligatoires",
+     "new-password-not-match": "Les nouveaux mots de passe ne correspondent pas.",
+diff --git a/web/src/locales/gl.json b/web/src/locales/gl.json
+index 11a32ad..8675139 100644
+--- a/web/src/locales/gl.json
++++ b/web/src/locales/gl.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Tes certeza de querer eliminar esta memo?",
+     "delete-confirm-description": "Esta acción non se pode desfacer. Vanse eliminar tamén as ligazóns e referencias.",
+     "direction": "Dirección",
++    "duplicate": "Duplicar",
++    "edited": "Editada",
+     "filters": {
+       "has-attachments": "ten anexos",
+       "has-code": "hasCode",
+@@ -372,6 +374,7 @@
+     "copied": "Copiada",
+     "deleted-successfully": "Memo eliminada correctamente",
+     "description-is-required": "Requírese unha descrición",
++    "duplicated-successfully": "Nota duplicada correctamente",
+     "fill-all": "Completa todos os campos.",
+     "fill-all-required-fields": "Por favor, completa todos os campos requeridos",
+     "new-password-not-match": "Os novos contrasinais non concordan.",
+diff --git a/web/src/locales/he.json b/web/src/locales/he.json
+index 8ba185a..5ae7b8b 100644
+--- a/web/src/locales/he.json
++++ b/web/src/locales/he.json
+@@ -360,6 +360,8 @@
+     "delete-confirm": "האם אתם בטוחים שברצונכם למחוק את הפתק הזה?\n\nפעולה זו אינה הפיכה",
+     "delete-confirm-description": "פעולה זו אינה הפיכה. גם קבצים מצורפים, קישורים והפניות יוסרו.",
+     "direction": "כיוון",
++    "duplicate": "שכפול",
++    "edited": "נערך",
+     "filters": {
+       "has-attachments": "מכיל קבצים מצורפים",
+       "has-code": "מכיל קוד",
+@@ -443,6 +445,7 @@
+     "copied": "הועתק",
+     "deleted-successfully": "הפתק נמחק בהצלחה",
+     "description-is-required": "נדרש תיאור",
++    "duplicated-successfully": "ההערה שוכפלה בהצלחה",
+     "fill-all": "מלאו את כל השדות.",
+     "fill-all-required-fields": "מלאו את כל השדות הנדרשים",
+     "new-password-not-match": "הסיסמאות החדשות אינן תואמות.",
+diff --git a/web/src/locales/hi.json b/web/src/locales/hi.json
+index 2a17ca3..fb05d10 100644
+--- a/web/src/locales/hi.json
++++ b/web/src/locales/hi.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "क्या आप इस मेमो को हटाने के लिए सुनिश्चित हैं? यह कार्रवाई वापस नहीं की जा सकती।",
+     "delete-confirm-description": "यह कार्रवाई वापस नहीं की जा सकती। संलग्नक, लिंक और संदर्भ भी हटा दिए जाएंगे।",
+     "direction": "दिशा",
++    "duplicate": "डुप्लिकेट करें",
++    "edited": "संपादित",
+     "filters": {
+       "has-attachments": "अटैचमेंट है",
+       "has-code": "कोड है",
+@@ -367,6 +369,7 @@
+     "copied": "कॉपी किया गया",
+     "deleted-successfully": "सफलतापूर्वक हटाया गया",
+     "description-is-required": "विवरण आवश्यक है",
++    "duplicated-successfully": "मेमो सफलतापूर्वक डुप्लिकेट किया गया",
+     "fill-all": "कृपया सभी फ़ील्ड भरें।",
+     "fill-all-required-fields": "कृपया सभी आवश्यक फ़ील्ड भरें",
+     "new-password-not-match": "नए पासवर्ड मेल नहीं खाते।",
+diff --git a/web/src/locales/hr.json b/web/src/locales/hr.json
+index 1b23a58..8580b35 100644
+--- a/web/src/locales/hr.json
++++ b/web/src/locales/hr.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Jesi li siguran da želiš obrisati ovaj memo? OVA AKCIJA JE NEPOVRATNA",
+     "delete-confirm-description": "Ova akcija je nepovratna. Privici, linkovi i reference će također biti uklonjeni.",
+     "direction": "Smjer",
++    "duplicate": "Dupliciraj",
++    "edited": "Uređeno",
+     "filters": {
+       "has-attachments": "ima privitke",
+       "has-code": "imaKod",
+@@ -372,6 +374,7 @@
+     "copied": "Kopirano",
+     "deleted-successfully": "Uspješno obrisano",
+     "description-is-required": "Opis je obavezan",
++    "duplicated-successfully": "Bilješka je uspješno duplicirana",
+     "fill-all": "Molimo, popuni sva polja.",
+     "fill-all-required-fields": "Molimo, popuni sva obavezna polja",
+     "new-password-not-match": "Nove lozinke se ne podudaraju.",
+diff --git a/web/src/locales/hu.json b/web/src/locales/hu.json
+index 6214e4a..a2e9b8f 100644
+--- a/web/src/locales/hu.json
++++ b/web/src/locales/hu.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Biztosan törlöd ezt a jegyzetet? EZ A MŰVELET VÉGLEGES",
+     "delete-confirm-description": "Ez a művelet visszafordíthatatlan. A mellékletek, hivatkozások és referenciák is törlődnek.",
+     "direction": "Irány",
++    "duplicate": "Duplikálás",
++    "edited": "Szerkesztve",
+     "filters": {
+       "has-attachments": "van melléklet",
+       "has-code": "vanKód",
+@@ -372,6 +374,7 @@
+     "copied": "Másolva",
+     "deleted-successfully": "Sikeres törlés",
+     "description-is-required": "Leírás szükséges",
++    "duplicated-successfully": "A jegyzet sikeresen duplikálva",
+     "fill-all": "Töltsd ki az összes mezőt.",
+     "fill-all-required-fields": "Töltsd ki az összes kötelező mezőt",
+     "new-password-not-match": "Az új jelszavak nem egyeznek.",
+diff --git a/web/src/locales/id.json b/web/src/locales/id.json
+index da990a3..b4953fe 100644
+--- a/web/src/locales/id.json
++++ b/web/src/locales/id.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "Apakah Anda yakin ingin menghapus memo ini? TINDAKAN INI TIDAK DAPAT DIBATALKAN",
+     "delete-confirm-description": "Tindakan ini tidak dapat dibatalkan. Lampiran, tautan, dan referensi juga akan dihapus.",
+     "direction": "Arah",
++    "duplicate": "Duplikat",
++    "edited": "Diedit",
+     "filters": {
+       "has-attachments": "Memiliki lampiran",
+       "has-code": "Memiliki kode",
+@@ -367,6 +369,7 @@
+     "copied": "Disalin",
+     "deleted-successfully": "Berhasil dihapus",
+     "description-is-required": "Deskripsi wajib diisi",
++    "duplicated-successfully": "Memo berhasil diduplikasi",
+     "fill-all": "Harap isi semua kolom.",
+     "fill-all-required-fields": "Harap isi semua kolom wajib",
+     "new-password-not-match": "Kata sandi baru tidak cocok.",
+diff --git a/web/src/locales/it.json b/web/src/locales/it.json
+index 88c9e93..ab4a326 100644
+--- a/web/src/locales/it.json
++++ b/web/src/locales/it.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Confermi di voler eliminare questo memo?",
+     "delete-confirm-description": "Questa azione è irreversibile. Allegati, link e riferimenti saranno rimossi.",
+     "direction": "Direzione",
++    "duplicate": "Duplica",
++    "edited": "Modificato",
+     "filters": {
+       "has-attachments": "ha allegati",
+       "has-code": "haCodice",
+@@ -372,6 +374,7 @@
+     "copied": "Copiato",
+     "deleted-successfully": "Eliminato con successo",
+     "description-is-required": "La descrizione è obbligatoria",
++    "duplicated-successfully": "Memo duplicato con successo",
+     "fill-all": "Compila tutti i campi",
+     "fill-all-required-fields": "Compila tutti i campi obbligatori",
+     "new-password-not-match": "Le nuove password non corrispondono",
+diff --git a/web/src/locales/ja.json b/web/src/locales/ja.json
+index 60aa994..ceb0db8 100644
+--- a/web/src/locales/ja.json
++++ b/web/src/locales/ja.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "本当に削除しますか? この操作は元に戻せません。",
+     "delete-confirm-description": "この操作は元に戻せません。添付ファイル、リンク、参照も削除されます。",
+     "direction": "並び順",
++    "duplicate": "複製",
++    "edited": "編集済み",
+     "filters": {
+       "has-attachments": "添付ファイルあり",
+       "has-code": "コードあり",
+@@ -372,6 +374,7 @@
+     "copied": "コピーしました！",
+     "deleted-successfully": "削除されました",
+     "description-is-required": "説明は必須です",
++    "duplicated-successfully": "メモを複製しました",
+     "fill-all": "すべての項目を入力してください。",
+     "fill-all-required-fields": "すべての必須項目を入力してください",
+     "new-password-not-match": "新しいパスワードが一致しません",
+diff --git a/web/src/locales/ka-GE.json b/web/src/locales/ka-GE.json
+index 791dd4a..205b4a8 100644
+--- a/web/src/locales/ka-GE.json
++++ b/web/src/locales/ka-GE.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "დარწმუნებული ხართ, რომ გინდათ ამ მემოს წაშლა? ეს ქმედება შეუქცევადია",
+     "delete-confirm-description": "ეს ქმედება შეუქცევადია. დანართები, ლინკები და რეფერენციებიც წაიშლება.",
+     "direction": "მიმართულება",
++    "duplicate": "დუბლირება",
++    "edited": "რედაქტირებულია",
+     "filters": {
+       "has-attachments": "აქვს დანართები",
+       "has-code": "კოდიარის",
+@@ -372,6 +374,7 @@
+     "copied": "კოპირებული",
+     "deleted-successfully": "წარმატებით წაიშალა",
+     "description-is-required": "აღწერა აუცილებელია",
++    "duplicated-successfully": "ჩანაწერი წარმატებით დუბლირდა",
+     "fill-all": "გთხოვთ შეავსოთ ყველა ველი.",
+     "fill-all-required-fields": "გთხოვთ შეავსოთ ყველა აუცილებელი ველი",
+     "new-password-not-match": "ახალი პაროლები არ ემთხვევა.",
+diff --git a/web/src/locales/ko.json b/web/src/locales/ko.json
+index d236fe8..9d62f68 100644
+--- a/web/src/locales/ko.json
++++ b/web/src/locales/ko.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "이 메모를 삭제하시겠습니까?",
+     "delete-confirm-description": "이 행동은 되돌릴 수 없으며, 첨부파일, 링크 및 참조가 삭제됩니다.",
+     "direction": "정렬",
++    "duplicate": "복제",
++    "edited": "수정됨",
+     "filters": {
+       "has-attachments": "첨부 파일 있음",
+       "has-code": "코드있음",
+@@ -367,6 +369,7 @@
+     "copied": "복사했습니다",
+     "deleted-successfully": "성공적으로 삭제되었습니다",
+     "description-is-required": "설명이 필요합니다",
++    "duplicated-successfully": "메모를 복제했습니다",
+     "fill-all": "모든 칸을 채워 주세요.",
+     "fill-all-required-fields": "필수 항목을 모두 입력하세요",
+     "new-password-not-match": "새 비밀번호가 서로 맞지 않습니다.",
+diff --git a/web/src/locales/lt.json b/web/src/locales/lt.json
+index 28a8977..2fc4a0f 100644
+--- a/web/src/locales/lt.json
++++ b/web/src/locales/lt.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Ar tikrai norite ištrinti šią atmintinę?",
+     "delete-confirm-description": "Šis veiksmas yra negrįžtamas. Taip pat bus pašalinti priedai, nuorodos ir nuorodos.",
+     "direction": "Kryptis",
++    "duplicate": "Dubliuoti",
++    "edited": "Redaguota",
+     "filters": {
+       "has-attachments": "turi priedų",
+       "has-code": "hasCode",
+@@ -410,6 +412,7 @@
+     "copied": "Nukopijuota",
+     "deleted-successfully": "Atmintinė sėkmingai ištrinta",
+     "description-is-required": "Būtinas aprašymas",
++    "duplicated-successfully": "Užrašas sėkmingai dubliuotas",
+     "fill-all": "Prašome užpildyti visus laukus.",
+     "fill-all-required-fields": "Užpildykite visus privalomus laukus",
+     "new-password-not-match": "Nauji slaptažodžiai nesutampa.",
+diff --git a/web/src/locales/lv.json b/web/src/locales/lv.json
+index c262163..2820f08 100644
+--- a/web/src/locales/lv.json
++++ b/web/src/locales/lv.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Vai tiešām vēlaties dzēst šo piezīmi?",
+     "delete-confirm-description": "Šī darbība ir neatgriezeniska. Tiks noņemti arī pielikumi, saites un atsauces.",
+     "direction": "Virziens",
++    "duplicate": "Dublēt",
++    "edited": "Rediģēts",
+     "filters": {
+       "has-attachments": "ir pielikumi",
+       "has-code": "hasCode",
+@@ -410,6 +412,7 @@
+     "copied": "Kopēts",
+     "deleted-successfully": "Piezīme veiksmīgi izdzēsta",
+     "description-is-required": "Nepieciešams apraksts",
++    "duplicated-successfully": "Piezīme veiksmīgi dublēta",
+     "fill-all": "Lūdzu, aizpildiet visus laukus.",
+     "fill-all-required-fields": "Lūdzu, aizpildiet visus nepieciešamos laukus",
+     "new-password-not-match": "Jaunās paroles nesakrīt.",
+diff --git a/web/src/locales/mr.json b/web/src/locales/mr.json
+index 5150ed8..a5e0fad 100644
+--- a/web/src/locales/mr.json
++++ b/web/src/locales/mr.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "हा मेमो हटवण्याची तुम्हाला खात्री आहे का? हि क्रिया अपरिवर्तनीय आहे",
+     "delete-confirm-description": "ही क्रिया अपरिवर्तनीय आहे. संलग्नक, लिंक आणि संदर्भ देखील काढून टाकले जातील.",
+     "direction": "दिशा",
++    "duplicate": "प्रत बनवा",
++    "edited": "संपादित",
+     "filters": {
+       "has-attachments": "संलग्नक आहे",
+       "has-code": "कोड आहे",
+@@ -367,6 +369,7 @@
+     "copied": "प्रत बनवली",
+     "deleted-successfully": "यशस्वीरित्या हटवले",
+     "description-is-required": "वर्णन आवश्यक आहे",
++    "duplicated-successfully": "मेमोची प्रत यशस्वीरित्या तयार झाली",
+     "fill-all": "कृपया सर्व फील्ड भरा.",
+     "fill-all-required-fields": "कृपया सर्व आवश्यक फील्ड भरा",
+     "new-password-not-match": "नवीन पासवर्ड जुळत नाहीत.",
+diff --git a/web/src/locales/nb.json b/web/src/locales/nb.json
+index f8f0c3d..df963f3 100644
+--- a/web/src/locales/nb.json
++++ b/web/src/locales/nb.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Er du sikker på at du vil slette denne memoen? DENNE HANDLINGEN KAN IKKE ANGRES",
+     "delete-confirm-description": "Denne handlingen kan ikke angres. Vedlegg, lenker og referanser vil også bli fjernet.",
+     "direction": "Retning",
++    "duplicate": "Dupliser",
++    "edited": "Redigert",
+     "filters": {
+       "has-attachments": "har vedlegg",
+       "has-code": "harKode",
+@@ -372,6 +374,7 @@
+     "copied": "Kopiert",
+     "deleted-successfully": "Sletting vellykket",
+     "description-is-required": "Beskrivelse kreves",
++    "duplicated-successfully": "Notatet ble duplisert",
+     "fill-all": "Vennligst fyll ut alle feltene.",
+     "fill-all-required-fields": "Vennligst fyll ut alle obligatoriske felter",
+     "new-password-not-match": "Nye passord samsvarer ikke.",
+diff --git a/web/src/locales/nl.json b/web/src/locales/nl.json
+index a4ecd2f..20120fe 100644
+--- a/web/src/locales/nl.json
++++ b/web/src/locales/nl.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Weet je zeker dat je deze memo wilt verwijderen? DEZE ACTIE IS NIET TERUG TE DRAAIEN",
+     "delete-confirm-description": "Deze actie is onomkeerelijk. Bijlagen, links en referenties worden ook verwijderd.",
+     "direction": "Richting",
++    "duplicate": "Dupliceren",
++    "edited": "Bewerkt",
+     "filters": {
+       "has-attachments": "heeft bijlagen",
+       "has-code": "heeftCode",
+@@ -372,6 +374,7 @@
+     "copied": "Gekopieerd",
+     "deleted-successfully": "Succesvol verwijderd",
+     "description-is-required": "Beschrijving is verplicht",
++    "duplicated-successfully": "Memo succesvol gedupliceerd",
+     "fill-all": "Vul alsjeblieft alle velden in.",
+     "fill-all-required-fields": "Vul alle verplichte velden in",
+     "new-password-not-match": "Nieuwe wachtwoorden komen niet overeen.",
+diff --git a/web/src/locales/nn.json b/web/src/locales/nn.json
+index 7d5adf0..5aff8eb 100644
+--- a/web/src/locales/nn.json
++++ b/web/src/locales/nn.json
+@@ -388,6 +388,8 @@
+     "delete-confirm": "Er du viss på at du vil slette dette notatet?",
+     "delete-confirm-description": "Denne handlinga kan ikkje gjerast om. Vedlegg, lenkjer og tilvisingar vert òg fjerna.",
+     "direction": "Retning",
++    "duplicate": "Dupliser",
++    "edited": "Redigert",
+     "filters": {
+       "has-attachments": "Har vedlegg",
+       "has-code": "Har kode",
+@@ -469,6 +471,7 @@
+     "copied": "Kopiert",
+     "deleted-successfully": "Notatet er sletta",
+     "description-is-required": "Skildring er naudsynt",
++    "duplicated-successfully": "Notatet vart duplisert",
+     "fill-all": "Fyll ut alle felta.",
+     "fill-all-required-fields": "Fyll ut alle naudsynte felt",
+     "new-password-not-match": "Dei nye passorda er ikkje like.",
+diff --git a/web/src/locales/pl.json b/web/src/locales/pl.json
+index c7bb344..c75d786 100644
+--- a/web/src/locales/pl.json
++++ b/web/src/locales/pl.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Czy na pewno chcesz usunąć tę notatkę?",
+     "delete-confirm-description": "Czy na pewno chcesz usunąć tę notatkę? Załączniki, linki i odnośniki także będą usunięte. TA AKCJA JEST NIEODWRACALNA",
+     "direction": "Kierunek",
++    "duplicate": "Duplikuj",
++    "edited": "Edytowano",
+     "filters": {
+       "has-attachments": "ma załączniki",
+       "has-code": "ma kod",
+@@ -372,6 +374,7 @@
+     "copied": "Skopiowano",
+     "deleted-successfully": "Usunięto pomyślnie",
+     "description-is-required": "Opis jest wymagany",
++    "duplicated-successfully": "Notatka została zduplikowana",
+     "fill-all": "Proszę wypełnić wszystkie pola.",
+     "fill-all-required-fields": "Proszę wypełnić wszystkie wymagane pola",
+     "new-password-not-match": "Nowe hasła nie pasują do siebie.",
+diff --git a/web/src/locales/pt-BR.json b/web/src/locales/pt-BR.json
+index ba5ff42..c103900 100644
+--- a/web/src/locales/pt-BR.json
++++ b/web/src/locales/pt-BR.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "Tem certeza de que deseja deletar este memo?\n\nESTA AÇÃO É IRREVERSÍVEL",
+     "delete-confirm-description": "Esta ação é irreversível. Anexos, links e referências também serão removidos.",
+     "direction": "Sentido",
++    "duplicate": "Duplicar",
++    "edited": "Editado",
+     "filters": {
+       "has-attachments": "tem anexos",
+       "has-code": "temCódigo",
+@@ -367,6 +369,7 @@
+     "copied": "Copiado",
+     "deleted-successfully": "Êxito na exclusão",
+     "description-is-required": "A descrição é necessária",
++    "duplicated-successfully": "Memo duplicado com sucesso",
+     "fill-all": "Por favor, preencha todos os campos.",
+     "fill-all-required-fields": "Por favor, preencha todos os campos obrigatórios",
+     "new-password-not-match": "As novas senhas não coincidem.",
+diff --git a/web/src/locales/pt-PT.json b/web/src/locales/pt-PT.json
+index 311b297..e62ffcd 100644
+--- a/web/src/locales/pt-PT.json
++++ b/web/src/locales/pt-PT.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Tem a certeza de que quer eliminar este memo?",
+     "delete-confirm-description": "Esta ação é irreversível. Os anexos, links e referências também serão removidos.",
+     "direction": "Direção",
++    "duplicate": "Duplicar",
++    "edited": "Editado",
+     "filters": {
+       "has-attachments": "tem anexos",
+       "has-code": "temCódigo",
+@@ -372,6 +374,7 @@
+     "copied": "Copiado",
+     "deleted-successfully": "Eliminado com sucesso",
+     "description-is-required": "A descrição é obrigatória",
++    "duplicated-successfully": "Memo duplicado com sucesso",
+     "fill-all": "Por favor, preencha todos os campos.",
+     "fill-all-required-fields": "Por favor, preencha todos os campos obrigatórios",
+     "new-password-not-match": "As novas palavras-passe não coincidem.",
+diff --git a/web/src/locales/ro.json b/web/src/locales/ro.json
+index d97c5d3..95b84d9 100644
+--- a/web/src/locales/ro.json
++++ b/web/src/locales/ro.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Sigur doriți să ștergeți această notă?",
+     "delete-confirm-description": "Această acțiune este ireversibilă. Atașamentele, linkurile și referințele vor fi, de asemenea, eliminate.",
+     "direction": "Direcţie",
++    "duplicate": "Duplică",
++    "edited": "Editat",
+     "filters": {
+       "has-attachments": "are atașamente",
+       "has-code": "areCode",
+@@ -410,6 +412,7 @@
+     "copied": "Copiat",
+     "deleted-successfully": "Memo a fost șters cu succes",
+     "description-is-required": "Este necesară descrierea",
++    "duplicated-successfully": "Notița a fost duplicată cu succes",
+     "fill-all": "Vă rugăm să completați toate câmpurile.",
+     "fill-all-required-fields": "Vă rugăm să completați toate câmpurile obligatorii",
+     "new-password-not-match": "Parolele noi nu se potrivesc.",
+diff --git a/web/src/locales/ru.json b/web/src/locales/ru.json
+index 6faf72e..567b6ed 100644
+--- a/web/src/locales/ru.json
++++ b/web/src/locales/ru.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Вы уверены, что хотите удалить эту запись?\nЭТО ДЕЙСТВИЕ НЕЛЬЗЯ ОТМЕНИТЬ!",
+     "delete-confirm-description": "Это действие нельзя отменить. Вложения, ссылки и упоминания также будут удалены.",
+     "direction": "Сортировка",
++    "duplicate": "Дублировать",
++    "edited": "Изменено",
+     "filters": {
+       "has-attachments": "есть вложения",
+       "has-code": "hasCode",
+@@ -372,6 +374,7 @@
+     "copied": "Скопировано",
+     "deleted-successfully": "Успешное удаление",
+     "description-is-required": "Необходимо заполнить \"Описание\"",
++    "duplicated-successfully": "Заметка успешно продублирована",
+     "fill-all": "Пожалуйста, заполните все поля",
+     "fill-all-required-fields": "Пожалуйста, заполните все необходимые поля",
+     "new-password-not-match": "Новый пароль не совпадает.",
+diff --git a/web/src/locales/sk.json b/web/src/locales/sk.json
+index 1bdc443..2d694ee 100644
+--- a/web/src/locales/sk.json
++++ b/web/src/locales/sk.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Naozaj chcete odstrániť túto poznámku?",
+     "delete-confirm-description": "Táto akcia je nezvratná. Odstránia sa aj prílohy, odkazy a referencie.",
+     "direction": "Smer",
++    "duplicate": "Duplikovať",
++    "edited": "Upravené",
+     "filters": {
+       "has-attachments": "má prílohy",
+       "has-code": "hasCode",
+@@ -410,6 +412,7 @@
+     "copied": "Skopírované",
+     "deleted-successfully": "Poznámka bola úspešne odstránená",
+     "description-is-required": "Vyžaduje sa popis",
++    "duplicated-successfully": "Poznámka bola úspešne duplikovaná",
+     "fill-all": "Vyplňte všetky polia.",
+     "fill-all-required-fields": "Vyplňte všetky povinné polia",
+     "new-password-not-match": "Nové heslá sa nezhodujú.",
+diff --git a/web/src/locales/sl.json b/web/src/locales/sl.json
+index d7a4988..0566d51 100644
+--- a/web/src/locales/sl.json
++++ b/web/src/locales/sl.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Ali ste prepričani, da želite izbrisati to beležko? TO DEJANJE JE NEPOVRATNO",
+     "delete-confirm-description": "To dejanje je nepovratno. Priložene datoteke, povezave in reference bodo prav tako odstranjene.",
+     "direction": "Smer",
++    "duplicate": "Podvoji",
++    "edited": "Urejeno",
+     "filters": {
+       "has-attachments": "ima priloge",
+       "has-code": "imaKodo",
+@@ -372,6 +374,7 @@
+     "copied": "Skopirano",
+     "deleted-successfully": "Uspešno izbrisano",
+     "description-is-required": "Potreben je opis.",
++    "duplicated-successfully": "Zapisek je bil uspešno podvojen",
+     "fill-all": "Prosim izpolnite vsa polja.",
+     "fill-all-required-fields": "Prosim izpolnite vsa zahtevana polja.",
+     "new-password-not-match": "Novi gesli se ne ujemata.",
+diff --git a/web/src/locales/sr.json b/web/src/locales/sr.json
+index d2493ad..f4ba2b3 100644
+--- a/web/src/locales/sr.json
++++ b/web/src/locales/sr.json
+@@ -327,6 +327,8 @@
+     "delete-confirm": "Да ли сте сигурни да желите да избришете ову белешку?",
+     "delete-confirm-description": "Ова акција је неповратна. Прилози, везе и референце ће такође бити уклоњени.",
+     "direction": "Правац",
++    "duplicate": "Дуплирај",
++    "edited": "Измењено",
+     "filters": {
+       "has-attachments": "има прилоге",
+       "has-code": "хасЦоде",
+@@ -410,6 +412,7 @@
+     "copied": "Копирано",
+     "deleted-successfully": "Белешка је успешно избрисана",
+     "description-is-required": "Опис је обавезан",
++    "duplicated-successfully": "Белешка је успешно дуплирана",
+     "fill-all": "Молимо попуните сва поља.",
+     "fill-all-required-fields": "Попуните сва обавезна поља",
+     "new-password-not-match": "Нове лозинке се не поклапају.",
+diff --git a/web/src/locales/sv.json b/web/src/locales/sv.json
+index 728238f..0ea4aa0 100644
+--- a/web/src/locales/sv.json
++++ b/web/src/locales/sv.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Är du säker på att du vill radera denna anteckning? DENNA ÅTGÄRD ÄR OÅTERKALLELIG",
+     "delete-confirm-description": "Denna åtgärd är oåterkallelig. Bilagor, länk och referenser kommer också att tas bort.",
+     "direction": "Riktning",
++    "duplicate": "Duplicera",
++    "edited": "Redigerad",
+     "filters": {
+       "has-attachments": "har bilagor",
+       "has-code": "harKod",
+@@ -372,6 +374,7 @@
+     "copied": "Kopierad",
+     "deleted-successfully": "Raderad framgångsrikt",
+     "description-is-required": "Beskrivning krävs",
++    "duplicated-successfully": "Anteckningen har duplicerats",
+     "fill-all": "Var god fyll i alla fält.",
+     "fill-all-required-fields": "Var god fyll i alla obligatoriska fält",
+     "new-password-not-match": "Nya lösenord matchar inte.",
+diff --git a/web/src/locales/th.json b/web/src/locales/th.json
+index ea0f7c7..2bae1cd 100644
+--- a/web/src/locales/th.json
++++ b/web/src/locales/th.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "คุณแน่ใจหรือไม่ ว่าต้องการลบบันทึกนี้? การกระทำนี้ไม่สามารถย้อนกลับได้",
+     "delete-confirm-description": "การดำเนินการนี้ไม่สามารถย้อนกลับได้ ไฟล์แนบ ลิงก์ และการอ้างอิงจะถูกลบออกด้วย",
+     "direction": "ทิศทาง",
++    "duplicate": "ทำสำเนา",
++    "edited": "แก้ไขแล้ว",
+     "filters": {
+       "has-attachments": "มีไฟล์แนบ",
+       "has-code": "มีโค้ด",
+@@ -367,6 +369,7 @@
+     "copied": "คัดลอกแล้ว",
+     "deleted-successfully": "ลบเรียบร้อยแล้ว",
+     "description-is-required": "ต้องระบุคำอธิบาย",
++    "duplicated-successfully": "ทำสำเนาบันทึกสำเร็จ",
+     "fill-all": "กรุณากรอกข้อมูลให้ครบทุกช่อง",
+     "fill-all-required-fields": "กรุณากรอกข้อมูลที่จำเป็นให้ครบ",
+     "new-password-not-match": "รหัสผ่านใหม่ไม่ตรงกัน",
+diff --git a/web/src/locales/tr.json b/web/src/locales/tr.json
+index e604cd2..458b93a 100644
+--- a/web/src/locales/tr.json
++++ b/web/src/locales/tr.json
+@@ -320,6 +320,8 @@
+     "delete-confirm": "Bu notu silmek istediğinizden emin misiniz?",
+     "delete-confirm-description": "Bu işlem geri alınamaz. Ekler, bağlantılar ve referanslar da kaldırılacaktır.",
+     "direction": "Yön",
++    "duplicate": "Çoğalt",
++    "edited": "Düzenlendi",
+     "filters": {
+       "has-attachments": "Ek içerir",
+       "has-code": "Kod içerir",
+@@ -398,6 +400,7 @@
+     "copied": "Kopyalandı",
+     "deleted-successfully": "Başarıyla silindi",
+     "description-is-required": "Açıklama gerekli",
++    "duplicated-successfully": "Not başarıyla çoğaltıldı",
+     "fill-all": "Lütfen tüm alanları doldurun.",
+     "fill-all-required-fields": "Lütfen tüm gerekli alanları doldurun",
+     "new-password-not-match": "Yeni şifreler eşleşmiyor.",
+diff --git a/web/src/locales/uk.json b/web/src/locales/uk.json
+index 7a8aeb7..fe16916 100644
+--- a/web/src/locales/uk.json
++++ b/web/src/locales/uk.json
+@@ -288,6 +288,8 @@
+     "delete-confirm": "Ви впевнені, що хочете видалити цю нотатку? ЦЯ ДІЯ Є НЕВІДКЛИКНОЮ",
+     "delete-confirm-description": "Ця дія є незворотною. Вкладення, посилання та посилання також буде видалено.",
+     "direction": "Напрямок",
++    "duplicate": "Дублювати",
++    "edited": "Змінено",
+     "filters": {
+       "has-attachments": "є вкладення",
+       "has-code": "єКод",
+@@ -372,6 +374,7 @@
+     "copied": "Скопійовано",
+     "deleted-successfully": "Успішно видалено",
+     "description-is-required": "Опис є обов’язковим",
++    "duplicated-successfully": "Нотатку успішно продубльовано",
+     "fill-all": "Будь ласка, заповніть всі поля.",
+     "fill-all-required-fields": "Будь ласка, заповніть усі обов’язкові поля",
+     "new-password-not-match": "Нові паролі не співпадають.",
+diff --git a/web/src/locales/vi.json b/web/src/locales/vi.json
+index 2f57c8e..6d5ab40 100644
+--- a/web/src/locales/vi.json
++++ b/web/src/locales/vi.json
+@@ -283,6 +283,8 @@
+     "delete-confirm": "Bạn có chắc chắn muốn xóa ghi chú này không? HÀNH ĐỘNG NÀY KHÔNG THỂ HOÀN TÁC",
+     "delete-confirm-description": "Hành động này không thể hoàn tác. Tệp đính kèm, liên kết và tham chiếu cũng sẽ bị xóa.",
+     "direction": "Hướng",
++    "duplicate": "Nhân bản",
++    "edited": "Đã chỉnh sửa",
+     "filters": {
+       "has-attachments": "có tệp đính kèm",
+       "has-code": "cóMã",
+@@ -367,6 +369,7 @@
+     "copied": "Đã sao chép",
+     "deleted-successfully": "Xóa thành công",
+     "description-is-required": "Mô tả là bắt buộc",
++    "duplicated-successfully": "Đã nhân bản ghi chú thành công",
+     "fill-all": "Vui lòng điền vào tất cả các trường.",
+     "fill-all-required-fields": "Vui lòng điền vào tất cả các trường bắt buộc",
+     "new-password-not-match": "Mật khẩu mới không khớp.",
+diff --git a/web/src/locales/zh-Hans.json b/web/src/locales/zh-Hans.json
+index bd8d054..90abc59 100644
+--- a/web/src/locales/zh-Hans.json
++++ b/web/src/locales/zh-Hans.json
+@@ -315,6 +315,8 @@
+     "delete-confirm": "您确定要删除此条备忘录吗？",
+     "delete-confirm-description": "此操作是不可逆的，附件、链接和引用也会被删除。",
+     "direction": "排序方式",
++    "duplicate": "创建副本",
++    "edited": "已编辑",
+     "filters": {
+       "has-attachments": "有附件",
+       "has-code": "有代码",
+@@ -398,6 +400,7 @@
+     "copied": "已复制",
+     "deleted-successfully": "成功删除！",
+     "description-is-required": "请填写说明",
++    "duplicated-successfully": "备忘录已成功复制",
+     "fill-all": "请填写所有栏目。",
+     "fill-all-required-fields": "请填写所有必填项。",
+     "new-password-not-match": "新密码不一致。",
+diff --git a/web/src/locales/zh-Hant.json b/web/src/locales/zh-Hant.json
+index f895494..4e519f6 100644
+--- a/web/src/locales/zh-Hant.json
++++ b/web/src/locales/zh-Hant.json
+@@ -368,6 +368,8 @@
+     "delete-confirm": "您確定要刪除此備忘錄嗎？",
+     "delete-confirm-description": "此操作無法恢復。附件、連結和引用將一併被移除。",
+     "direction": "排序",
++    "duplicate": "建立副本",
++    "edited": "已編輯",
+     "filters": {
+       "has-attachments": "有附件",
+       "has-code": "有程式碼",
+@@ -451,6 +453,7 @@
+     "copied": "已複製",
+     "deleted-successfully": "刪除成功",
+     "description-is-required": "說明必填",
++    "duplicated-successfully": "備忘錄已成功複製",
+     "fill-all": "請填寫所有欄位。",
+     "fill-all-required-fields": "請填寫所有必填欄位",
+     "new-password-not-match": "新密碼不一致。",
+diff --git a/web/tests/memo-action-menu.test.tsx b/web/tests/memo-action-menu.test.tsx
+index 1d1af67..5b1f513 100644
+--- a/web/tests/memo-action-menu.test.tsx
++++ b/web/tests/memo-action-menu.test.tsx
+@@ -13,6 +13,7 @@ const handlers = vi.hoisted(() => ({
+   handleToggleMemoStatusClick: vi.fn(),
+   handleCopyLink: vi.fn(),
+   handleCopyContent: vi.fn(),
++  handleDuplicateMemoClick: vi.fn(),
+   handleCheckAllTaskListItemsClick: vi.fn(),
+   handleUncheckAllTaskListItemsClick: vi.fn(),
+   handleDeleteMemoClick: vi.fn(),
+@@ -64,11 +65,25 @@ describe("MemoActionMenu", () => {
+ 
+   it("groups an owner's memo actions by what they do to the card and puts Delete last, with no Move entry", async () => {
+     await openMenu(memoOf({ space: "spaces/work" }));
+-    expect(menuItemLabels()).toEqual(["common.edit", "common.pin", "common.archive", "common.open", "common.copy", "common.delete"]);
++    expect(menuItemLabels()).toEqual([
++      "common.edit",
++      "memo.duplicate",
++      "common.pin",
++      "common.archive",
++      "common.open",
++      "common.copy",
++      "common.delete",
++    ]);
+     const separators = screen.getAllByRole("separator");
+     expect(separators[separators.length - 1].nextElementSibling).toBe(screen.getByRole("menuitem", { name: "common.delete" }));
+   });
+ 
++  it("duplicates the memo from the menu", async () => {
++    await openMenu(memoOf());
++    fireEvent.click(screen.getByRole("menuitem", { name: "memo.duplicate" }));
++    expect(handlers.handleDuplicateMemoClick).toHaveBeenCalledOnce();
++  });
++
+   it("offers Unpin on a pinned memo", async () => {
+     await openMenu(memoOf({ pinned: true }));
+     fireEvent.click(screen.getByRole("menuitem", { name: "common.unpin" }));
+@@ -88,7 +103,7 @@ describe("MemoActionMenu", () => {
+   it("hides Open on the memo's own page", async () => {
+     handlers.isInMemoDetailPage = true;
+     await openMenu(memoOf());
+-    expect(menuItemLabels()).toEqual(["common.edit", "common.pin", "common.archive", "common.copy", "common.delete"]);
++    expect(menuItemLabels()).toEqual(["common.edit", "memo.duplicate", "common.pin", "common.archive", "common.copy", "common.delete"]);
+   });
+ 
+   it.each([
+@@ -96,7 +111,7 @@ describe("MemoActionMenu", () => {
+     [false, "memo.task-actions.uncheck-all", "handleUncheckAllTaskListItemsClick"],
+   ] as const)("shows one task action right after Edit (open tasks: %s)", async (hasIncompleteTasks, label, handler) => {
+     await openMenu(memoOf({ property: { hasTaskList: true, hasIncompleteTasks } }));
+-    expect(menuItemLabels().slice(0, 3)).toEqual(["common.edit", label, "common.pin"]);
++    expect(menuItemLabels().slice(0, 4)).toEqual(["common.edit", label, "memo.duplicate", "common.pin"]);
+     fireEvent.click(screen.getByRole("menuitem", { name: label }));
+     expect(handlers[handler]).toHaveBeenCalledOnce();
+   });
+diff --git a/web/tests/memo-action-navigation.test.tsx b/web/tests/memo-action-navigation.test.tsx
+index fa13daa..c36fdf6 100644
+--- a/web/tests/memo-action-navigation.test.tsx
++++ b/web/tests/memo-action-navigation.test.tsx
+@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+ import { act, renderHook, waitFor } from "@testing-library/react";
+ import type { ReactNode } from "react";
+ import { MemoryRouter, useLocation } from "react-router-dom";
++import toast from "react-hot-toast";
+ import { beforeEach, describe, expect, it, vi } from "vitest";
+ import { useMemoActionHandlers } from "@/components/MemoActionMenu/hooks";
+ import { State } from "@/types/proto/api/common_pb";
+@@ -9,6 +10,7 @@ import type { Memo } from "@/types/proto/api/memo_service_pb";
+ 
+ const mocks = vi.hoisted(() => ({
+   updateMemo: vi.fn(),
++  createMemo: vi.fn(),
+   deleteMemo: vi.fn(),
+   copy: vi.fn(),
+ }));
+@@ -21,6 +23,7 @@ vi.mock("@/hooks/useMemoQueries", () => ({
+     detail: (name: string) => ["memos", name, "detail"],
+   },
+   useUpdateMemo: () => ({ mutateAsync: mocks.updateMemo }),
++  useCreateMemo: () => ({ mutateAsync: mocks.createMemo }),
+   useDeleteMemo: () => ({ mutateAsync: mocks.deleteMemo }),
+ }));
+ 
+@@ -76,7 +79,10 @@ const renderActions = (state: State, parent = "", parentPage?: string) => {
+ describe("Memo detail mutation navigation", () => {
+   beforeEach(() => {
+     mocks.updateMemo.mockReset().mockResolvedValue(undefined);
++    mocks.createMemo.mockReset().mockResolvedValue({ name: "memos/2" });
+     mocks.deleteMemo.mockReset().mockResolvedValue(undefined);
++    vi.mocked(toast.success).mockClear();
++    vi.mocked(toast.error).mockClear();
+     mocks.copy.mockReset();
+   });
+ 
+@@ -129,4 +135,22 @@ describe("Memo detail mutation navigation", () => {
+     act(() => result.current.handlers.handleCopyLink());
+     expect(mocks.copy).toHaveBeenCalledWith(link);
+   });
++
++  it("duplicates a memo's content, audience and place into a new memo and confirms it", async () => {
++    const { result } = renderActions(State.NORMAL);
++    await act(() => result.current.handlers.handleDuplicateMemoClick());
++
++    expect(mocks.createMemo).toHaveBeenCalledOnce();
++    expect(mocks.createMemo.mock.calls[0][0].memo).toMatchObject({ content: "memo", visibility: 0 });
++    expect(toast.success).toHaveBeenCalledWith("message.duplicated-successfully");
++  });
++
++  it("reports a failed duplicate instead of confirming it", async () => {
++    mocks.createMemo.mockRejectedValue(new Error("quota"));
++    const { result } = renderActions(State.NORMAL);
++    await act(() => result.current.handlers.handleDuplicateMemoClick());
++
++    expect(toast.success).not.toHaveBeenCalled();
++    expect(toast.error).toHaveBeenCalled();
++  });
+ });
+diff --git a/web/tests/memo-header-navigation.test.tsx b/web/tests/memo-header-navigation.test.tsx
+index f79c574..d74b5e2 100644
+--- a/web/tests/memo-header-navigation.test.tsx
++++ b/web/tests/memo-header-navigation.test.tsx
+@@ -8,6 +8,8 @@ const state = vi.hoisted(() => ({
+   creator: undefined as { username: string; displayName: string; avatarUrl: string } | undefined,
+   currentUser: undefined as { name: string } | undefined,
+   isEditing: false,
++  isEdited: false,
++  isDisplayingUpdatedTime: false,
+ }));
+ 
+ vi.mock("@/components/RelativeTime", () => ({
+@@ -66,8 +68,9 @@ vi.mock("@/components/MemoView/MemoViewContext", () => ({
+   useMemoViewDerived: () => ({
+     createTime: new Date("2026-08-26T00:00:00Z"),
+     updateTime: undefined,
++    isEdited: state.isEdited,
+     displayTime: new Date("2026-08-26T00:00:00Z"),
+-    isDisplayingUpdatedTime: false,
++    isDisplayingUpdatedTime: state.isDisplayingUpdatedTime,
+     relativeTimeFormat: "auto",
+   }),
+ }));
+@@ -90,6 +93,8 @@ describe("MemoHeader navigation", () => {
+     state.creator = undefined;
+     state.currentUser = undefined;
+     state.isEditing = false;
++    state.isEdited = false;
++    state.isDisplayingUpdatedTime = false;
+   });
+ 
+   it.each([false, true])("keeps only the creator while the card edits in place (showCreator=%s)", (showCreator) => {
+@@ -116,6 +121,23 @@ describe("MemoHeader navigation", () => {
+     }
+   });
+ 
++  it.each([
++    [false, false, false],
++    [true, false, true],
++    [true, true, false],
++  ])("shows the edited label only on a changed memo that shows its creation time (edited=%s, update time=%s)", (edited, updated, shown) => {
++    state.isEdited = edited;
++    state.isDisplayingUpdatedTime = updated;
++
++    render(
++      <MemoryRouter>
++        <MemoHeader />
++      </MemoryRouter>,
++    );
++
++    expect(screen.queryByText("memo.edited") !== null).toBe(shown);
++  });
++
+   it("uses one compact interaction surface for memo header actions", () => {
+     state.currentUser = { name: "users/alice" };
+ 

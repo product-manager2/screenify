@@ -1,0 +1,201 @@
+diff --git a/web/src/components/MemoActionMenu/MemoActionMenu.tsx b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+index 035647c..928e964 100644
+--- a/web/src/components/MemoActionMenu/MemoActionMenu.tsx
++++ b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+@@ -6,6 +6,7 @@ import {
+   BookmarkPlusIcon,
+   CheckCheckIcon,
+   CopyIcon,
++  CopyPlusIcon,
+   Edit3Icon,
+   FileTextIcon,
+   LinkIcon,
+@@ -37,7 +38,7 @@ import type { MemoActionMenuProps } from "./types";
+ /**
+  * The memo's action menu, grouped by what each action does to the card:
+  * write on it (Edit, the task action), place it (Pin, Archive), reach it beyond
+- * the feed (Open its page, Copy its link or content), then Delete last.
++ * the feed (Open its page, Copy its link or content, Duplicate), then Delete last.
+  * A memo's Space is changed in the editor, not here. An archived memo offers
+  * only Restore and Delete, and a viewer only Open and Copy.
+  */
+@@ -53,12 +54,15 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+   const isArchived = memo.state === State.ARCHIVED;
+   const hasTaskList = Boolean(memo.property?.hasTaskList);
+   const hasOpenTasks = Boolean(memo.property?.hasIncompleteTasks);
++  // An attachment belongs to one memo, so a memo that has any cannot be copied whole.
++  const canDuplicate = !isComment && memo.attachments.length === 0;
+ 
+   // Action handlers
+   const {
+     isInMemoDetailPage,
+     handleTogglePinMemoBtnClick,
+     handleEditMemoClick,
++    handleDuplicateMemoClick,
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
+@@ -173,6 +177,12 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+         <DropdownMenuSeparator />
+         {openItem}
+         {copySubmenu}
++        {canDuplicate && (
++          <DropdownMenuItem onClick={handleDuplicateMemoClick}>
++            <CopyPlusIcon />
++            {t("common.duplicate")}
++          </DropdownMenuItem>
++        )}
+ 
+         <DropdownMenuSeparator />
+         {deleteItem}
+diff --git a/web/src/components/MemoActionMenu/hooks.ts b/web/src/components/MemoActionMenu/hooks.ts
+index 38344a6..6ea3a0e 100644
+--- a/web/src/components/MemoActionMenu/hooks.ts
++++ b/web/src/components/MemoActionMenu/hooks.ts
+@@ -1,17 +1,19 @@
++import { create } from "@bufbuild/protobuf";
+ import { useQueryClient } from "@tanstack/react-query";
+ import copy from "copy-to-clipboard";
+ import { useCallback } from "react";
+ import toast from "react-hot-toast";
+ import { useLocation } from "react-router-dom";
+ import { useInstance } from "@/contexts/InstanceContext";
+-import { memoKeys, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
++import { useNewMemo } from "@/contexts/NewMemoContext";
++import { memoKeys, useCreateMemo, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
+ import useNavigateTo from "@/hooks/useNavigateTo";
+ import { userKeys } from "@/hooks/useUserQueries";
+ import { handleError } from "@/lib/error";
+ import { extractMemoIdFromName } from "@/lib/resource-names";
+ import { ROUTES } from "@/router/routes";
+ import { State } from "@/types/proto/api/common_pb";
+-import type { Memo } from "@/types/proto/api/memo_service_pb";
++import { type Memo, MemoSchema } from "@/types/proto/api/memo_service_pb";
+ import { useTranslate } from "@/utils/i18n";
+ import { checkAllTasks, uncheckAllTasks } from "@/utils/markdown-task-actions";
+ import { isMemoDetailPath } from "../MemoView/navigation";
+@@ -31,6 +33,8 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+   const { profile } = useInstance();
+   const { mutateAsync: updateMemo } = useUpdateMemo();
+   const { mutateAsync: deleteMemo } = useDeleteMemo();
++  const { mutateAsync: createMemo } = useCreateMemo();
++  const { markNewMemo } = useNewMemo();
+   const isInMemoDetailPage = isMemoDetailPath(location.pathname, memo.name);
+ 
+   const memoUpdatedCallback = useCallback(() => {
+@@ -81,6 +85,19 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     onEdit?.();
+   }, [onEdit]);
+ 
++  const handleDuplicateMemoClick = useCallback(async () => {
++    try {
++      // The copy is a new memo of the same author, so it takes the current time, not the original's.
++      const duplicate = await createMemo({
++        memo: create(MemoSchema, { content: memo.content, visibility: memo.visibility, space: memo.space || undefined }),
++      });
++      markNewMemo(duplicate.name);
++      toast.success(t("message.duplicated-successfully"));
++    } catch (error: unknown) {
++      handleError(error, toast.error, { context: "Duplicate memo", fallbackMessage: "An error occurred" });
++    }
++  }, [memo.content, memo.visibility, memo.space, t, createMemo, markNewMemo]);
++
+   const handleToggleMemoStatusClick = useCallback(async () => {
+     const isArchiving = memo.state !== State.ARCHIVED;
+     const state = memo.state === State.ARCHIVED ? State.NORMAL : State.ARCHIVED;
+@@ -159,6 +176,7 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     isInMemoDetailPage,
+     handleTogglePinMemoBtnClick,
+     handleEditMemoClick,
++    handleDuplicateMemoClick,
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
+diff --git a/web/src/components/MemoView/MemoViewContext.tsx b/web/src/components/MemoView/MemoViewContext.tsx
+index 250c89d..6da48d3 100644
+--- a/web/src/components/MemoView/MemoViewContext.tsx
++++ b/web/src/components/MemoView/MemoViewContext.tsx
+@@ -55,6 +55,8 @@ export const useMemoViewDerived = () => {
+   const displayTime = timeBasis === "update_time" ? updateTime : createTime;
+   const isDisplayingUpdatedTime =
+     timeBasis === "update_time" && !!createTime && !!updateTime && updateTime.getTime() !== createTime.getTime();
++  // Seconds-precision timestamps: the server bumps update_time on every content, attachment or relation change.
++  const isEdited = !!createTime && !!updateTime && updateTime.getTime() > createTime.getTime();
+   const relativeTimeFormat: "datetime" | "auto" =
+     displayTime && Date.now() - displayTime.getTime() > RELATIVE_TIME_THRESHOLD_MS ? "datetime" : "auto";
+ 
+@@ -67,6 +69,7 @@ export const useMemoViewDerived = () => {
+     updateTime,
+     displayTime,
+     isDisplayingUpdatedTime,
++    isEdited,
+     relativeTimeFormat,
+   };
+ };
+diff --git a/web/src/components/MemoView/components/MemoHeader.tsx b/web/src/components/MemoView/components/MemoHeader.tsx
+index a4b73fb..7d6109e 100644
+--- a/web/src/components/MemoView/components/MemoHeader.tsx
++++ b/web/src/components/MemoView/components/MemoHeader.tsx
+@@ -29,7 +29,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+ 
+   const { memo, creator, currentUser, parentPage, isArchived, readonly, isEditing, openEditor } = useMemoViewContext();
+   const location = useLocation();
+-  const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, relativeTimeFormat } = useMemoViewDerived();
++  const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, isEdited, relativeTimeFormat } = useMemoViewDerived();
+   const { newMemoName } = useNewMemo();
+   const visibilityOption = getVisibilityOption(memo.visibility);
+ 
+@@ -89,6 +89,8 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+             parentPage={parentPage}
+             isCurrentPage={isMemoDetailPath(location.pathname, memo.name)}
+           />
++          {/* When the time already reads "Last updated at", the label would say it twice. */}
++          {isEdited && !isDisplayingUpdatedTime && <EditedLabel timeTooltip={timeTooltip} />}
+           {spaceMetadata}
+         </div>
+         {isNew && <NewBadge />}
+@@ -126,6 +128,16 @@ const NewBadge = () => {
+   );
+ };
+ 
++/** A quiet marker that the memo changed after it was created; the tooltip gives both times. */
++const EditedLabel = ({ timeTooltip }: { timeTooltip: TimeTooltipContent }) => {
++  const t = useTranslate();
++  return (
++    <TimeTooltip content={timeTooltip}>
++      <span className="shrink-0 whitespace-nowrap text-ui text-muted-foreground/70 select-none">{t("memo.edited")}</span>
++    </TimeTooltip>
++  );
++};
++
+ /**
+  * The author on one line with the time: a 20px avatar in a 20px slot, then the name in
+  * medium 13px foreground ink. It is the identity, so it carries the weight; the time after
+diff --git a/web/src/locales/en.json b/web/src/locales/en.json
+index 9e9eeca..e34cc30 100644
+--- a/web/src/locales/en.json
++++ b/web/src/locales/en.json
+@@ -162,6 +162,7 @@
+     "collapse-panel": "Collapse panel",
+     "confirm": "Confirm",
+     "copy": "Copy",
++    "duplicate": "Duplicate",
+     "create": "Create",
+     "created-at": "Created at",
+     "days": {
+@@ -413,6 +414,7 @@
+     "link-preview": "Link preview",
+     "load-more": "Load more",
+     "new-badge": "New",
++    "edited": "Edited",
+     "newest-first": "Newest first",
+     "oldest-first": "Oldest first",
+     "on-this-memo": "On this memo",
+@@ -468,6 +470,7 @@
+     "archived-successfully": "Archived successfully",
+     "copied": "Copied",
+     "deleted-successfully": "Memo deleted successfully",
++    "duplicated-successfully": "Memo duplicated successfully",
+     "description-is-required": "Description is required",
+     "fill-all": "Please fill in all fields.",
+     "fill-all-required-fields": "Please fill all required fields",

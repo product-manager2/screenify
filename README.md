@@ -46,7 +46,9 @@ Sonnet 5.5), same prompt, graded blind.
 The scenario was chosen where screenshots should help most, on a small, tidy app. A second test,
 redrawing three screens as HTML, did **not** favour the library on looks: code-only pages copied the
 app's own styles and icons, while library-guided pages got every word and state right but drew
-rougher icons. The library costs about $1.67 to build once. Every run, the grades, the costs and
+rougher icons. A third test, adding three features to Memos, did **not** favour it either: no
+library run opened a screenshot, and they scored 48/51 against 51/51 for code only and for
+browsing, at the same cost as code only. The library costs about $1.67 to build once. Every run, the grades, the costs and
 the limits are in [`benchmark/`](benchmark/).
 
 Screenify files still images: the states a recipe can stop on (a page, an open menu, a dialog),
