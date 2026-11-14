@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
-import { resolveViewport, type ViewportSpec } from './naming.js';
+import { resolveViewport, slug, type ViewportSpec } from './naming.js';
 import { rememberSecret } from './secrets.js';
 
 /**
  * Where to find an element. Preference order when writing recipes:
- * role+name, text, label, testId, css. A bare string is CSS.
+ * role+name, text, label, testId, css. A bare string is CSS. Names and text match as substrings
+ * unless `exact: true` ("Filters" alone, not "Open filters").
  */
 export type Locator =
   | string
@@ -96,6 +97,40 @@ export function isLocator(l: unknown): l is Locator {
   return keys.length === 1 && typeof (l as Record<string, unknown>)[keys[0]] === 'string';
 }
 
+/** Problems with one locator: its kind, and `exact` / `nth` where given. Empty when valid. */
+export function locatorProblems(l: unknown, where: string): string[] {
+  if (!isLocator(l)) return [`${where} must be a locator: a CSS string, or {"role"|"text"|"label"|"testId"|"css": "…"} with exactly one of those keys`];
+  if (typeof l === 'string') return [];
+  const o = l as Record<string, unknown>;
+  const errors: string[] = [];
+  if (o.exact !== undefined) {
+    if (typeof o.exact !== 'boolean') errors.push(`${where}: "exact" must be true or false`);
+    else if (!('role' in o || 'text' in o || 'label' in o)) errors.push(`${where}: "exact" applies to role, text and label locators only`);
+  }
+  if (o.nth !== undefined && !(Number.isInteger(o.nth) && (o.nth as number) >= 0)) errors.push(`${where}: "nth" must be a whole number from 0`);
+  if (o.name !== undefined && typeof o.name !== 'string') errors.push(`${where}: "name" must be a string`);
+  return errors;
+}
+
+/** The locator a step acts on, if it has one: `[where, locator]` pairs to validate. */
+function stepLocators(s: any): [string, unknown][] {
+  const out: [string, unknown][] = [];
+  for (const k of ['click', 'fill', 'select', 'hover']) if (s[k] !== undefined) out.push([`"${k}"`, s[k]]);
+  if (s.press !== undefined && s.on !== undefined) out.push(['"on"', s.on]);
+  if (s.waitFor !== undefined && !(s.waitFor && typeof s.waitFor === 'object' && 'url' in s.waitFor)) out.push(['"waitFor"', s.waitFor]);
+  return out;
+}
+
+/**
+ * True when `shows` only restates the plan item instead of describing the image: "discovery: …",
+ * or just the screen and state names ("task-list filled"). The agent writes `shows` after looking.
+ */
+export function placeholderShows(shows: string, screen: string, state: string): boolean {
+  if (/^\s*discovery\s*:/i.test(shows)) return true;
+  const said = slug(shows);
+  return [`${screen} ${state}`, `${state} ${screen}`, `${state} state of ${screen}`, `${screen} ${state} state`, screen, state].some((p) => slug(p) === said);
+}
+
 const isText = (v: unknown): boolean => typeof v === 'string' && v.trim() !== '';
 const isTextList = (v: unknown): boolean => isText(v) || (Array.isArray(v) && v.length > 0 && v.every(isText));
 
@@ -137,10 +172,13 @@ function viewportProblems(specs: unknown[]): string[] {
 }
 
 /** Problems in one `shot` step's options. */
-function validateShot(shot: any, kind: string, where: string): string[] {
+function validateShot(shot: any, kind: string, where: string, recipeName: string): string[] {
   if (!shot || typeof shot !== 'object' || Array.isArray(shot)) return [`${where}: "shot" must be an object with at least "shows"`];
   const errors: string[] = [];
   if (!isText(shot.shows)) errors.push(`${where}: "shows" must say in one line what the image shows, e.g. "Goals list with three goals, one at risk"`);
+  else if (placeholderShows(shot.shows, isText(shot.screen) ? shot.screen : recipeName, isText(shot.state) ? shot.state : 'default')) {
+    errors.push(`${where}: "shows" ("${shot.shows}") only names the screen and state; describe what the image actually shows, after looking at it`);
+  }
   if (kind === 'flow' && !isText(shot.caption)) errors.push(`${where}: a flow shot needs a "caption" naming the step just taken, e.g. "Click New task"`);
   for (const k of ['screen', 'state', 'caption']) if (shot[k] !== undefined && !isText(shot[k])) errors.push(`${where}: "${k}" must be a non-empty string`);
   if (shot.fullPage !== undefined && typeof shot.fullPage !== 'boolean') errors.push(`${where}: "fullPage" must be true or false`);
@@ -149,7 +187,7 @@ function validateShot(shot: any, kind: string, where: string): string[] {
   }
   if (shot.expect !== undefined) errors.push(...validateExpect(shot.expect, where));
   if (shot.scrollContainer !== undefined) {
-    if (!isLocator(shot.scrollContainer)) errors.push(`${where}: "scrollContainer" must be a locator (a CSS string or {"role"|"text"|"label"|"testId"|"css": …})`);
+    errors.push(...locatorProblems(shot.scrollContainer, `${where}: "scrollContainer"`));
     if (shot.fullPage === false) errors.push(`${where}: "scrollContainer" needs a full-page shot; drop "fullPage": false`);
   }
   return errors;
@@ -179,7 +217,8 @@ export function validateRecipe(r: any): string[] {
     if (keys.length !== 1) errors.push(`${where}: needs exactly one of ${ACTIONS.join(', ')}`);
     if ((s?.fill !== undefined || s?.select !== undefined) && typeof s.value !== 'string') errors.push(`${where}: "value" must be a string`);
     if (s?.wait !== undefined && typeof s.wait !== 'number') errors.push(`${where}: "wait" is milliseconds`);
-    if (s?.shot !== undefined) errors.push(...validateShot(s.shot, r.kind, where));
+    if (s?.shot !== undefined) errors.push(...validateShot(s.shot, r.kind, where, typeof r.name === 'string' ? r.name : ''));
+    if (s && typeof s === 'object') for (const [k, l] of stepLocators(s)) errors.push(...locatorProblems(l, `${where}: ${k}`));
   });
   const shots = r.steps.filter((s: any) => s?.shot !== undefined).length;
   if (r.kind !== 'auth' && shots === 0) errors.push('a screen or flow recipe needs at least one "shot" step');

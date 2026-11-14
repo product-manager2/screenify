@@ -23,7 +23,7 @@ export interface Config {
    * Recipes with `writes: true` refuse to run otherwise.
    */
   writesAllowed: boolean;
-  /** CSS selectors hidden in every screenshot (dev overlays and badges, e.g. `nextjs-portal`); chosen by the agent. */
+  /** CSS selectors hidden in every screenshot (overlays the app or its dev build draws over content); chosen by the agent. */
   hide: string[];
   /**
    * URL (relative to `baseUrl` or absolute) where the running app reports the commit it serves;
@@ -60,7 +60,7 @@ export function validateConfig(c: any): string[] {
   if (c.platforms !== undefined && !(Array.isArray(c.platforms) && c.platforms.every((p: unknown) => typeof p === 'string'))) errors.push('"platforms" must be a list of strings');
   if (c.writesAllowed !== undefined && typeof c.writesAllowed !== 'boolean') errors.push('"writesAllowed" must be true or false');
   if (c.hide !== undefined && !(Array.isArray(c.hide) && c.hide.every((s: unknown) => typeof s === 'string' && s.trim() !== ''))) {
-    errors.push('"hide" must be a list of CSS selectors, e.g. ["nextjs-portal"]');
+    errors.push('"hide" must be a list of CSS selectors, e.g. [".toast", "[data-dev-badge]"]');
   }
   return errors;
 }

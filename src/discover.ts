@@ -36,10 +36,14 @@ to six steps (create, edit, rename, delete, submit, invite), not whole-feature t
   whose "route" and "example" are the page they open from, and whose states' "how" lines give the
   steps from there ("Open /tasks, click New task"). Capture checks that the page stays on that route.
 - **Who and what capture needs.** "auth" names the account or role to capture as (member, admin,
-  guest); leave it out for screens a signed-out visitor sees. "requires" lists what the environment
-  must provide first: a feature flag, a build or release channel, seed data ("alpha build channel",
-  "a workspace with three goals"). Read the flag and gate checks in the code to fill it: a gated
-  screen captured without its flag shows a redirect or "not available" instead.
+  guest); leave it out for screens a signed-out visitor sees. "requires" is a free-text note of
+  what the user's environment must provide for the item to show, in plain words ("sample records
+  in the list", "the reports feature turned on for the account"); read the checks in the code that
+  hide or redirect the screen to write it. It is shown to the user and in reports; nothing acts on
+  it, and capture never changes the environment without the user's agreement.
+- **States that write.** Mark a state \`"writes": true\` when reaching it changes data or settings
+  (switching a theme stored in the account, toggling a preference); capture then runs it only where
+  writes are allowed.
 - **Flutter and other native apps:** screens are the routes or pages the app's navigator pushes
   (GoRouter or Navigator routes, tab roots, bottom sheets shown with showModalBottomSheet or the
   app's own adaptive panel). Plan states the same way. "route" is the screen's route path, or for a
@@ -87,11 +91,12 @@ Pipe JSON to \`screenify plan import -\` (or save it and pass the file). Shape:
       "states": [
         { "name": "filled", "how": "Open /tasks with the seed data loaded" },
         { "name": "empty", "how": "Start the app with no tasks (SEED_TASKS= empty)" },
-        { "name": "new-task-dialog-open", "how": "Click New task" }
+        { "name": "new-task-dialog-open", "how": "Click New task" },
+        { "name": "compact-view", "how": "Choose Compact in the view menu (saved to the account)", "writes": true }
       ],
       "sources": ["src/pages/tasks.tsx", "src/components/TaskRow.tsx", "src/api/tasks.ts"],
       "auth": "member",
-      "requires": ["three seed tasks for the filled state"]
+      "requires": ["a few sample tasks for the filled state"]
     },
     {
       "kind": "flow",
@@ -120,8 +125,8 @@ they touch. Re-import the items whose screens, states, flows or sources changed,
 screens, and remove items for screens that are gone. Leave the rest alone.
 
 Finish by reporting: how many screens and flows, which features, other platforms found, and
-anything capture needs that is not in the repo (credentials, external services, flags or build
-channels the "requires" lists name).`;
+anything capture needs that is not in the repo (credentials, external services, and what the
+"requires" notes name).`;
 
 /** The files changed since the plan's commit and which plan items list them. */
 export interface DiscoverChanges {

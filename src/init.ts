@@ -88,11 +88,14 @@ You do one Screenify step per task, as the task says:
   with "npx screenify plan import -". Do not change the repository's code.
 - Capture: follow ${join(skillDir, 'capture.md')}. Use the screenify CLI for every capture; never
   drive a browser yourself and never open a visible browser window.
-Never put a secret in a recipe; use \${ENV_VAR} in fill values and sign-in links. Run recipes with
-"writes": true only when the database is local or disposable. In capture, prepare the environment
-first (data, flags, theme) and open every new image and its sidecar afterwards: repair or skip any
-image that does not show the item and state it is named for. Stop and report an environment blocker
-once instead of retrying. Report what you did, what was skipped and why.
+Never put a secret in a recipe; use \${ENV_VAR} in fill values and sign-in links. Write recipes only
+under screenify-out/recipes/. Run recipes with "writes": true only when the database is local or
+disposable. The app's environment (accounts, sample data, workspaces, feature switches, settings)
+belongs to the user: start the app with the repo's own scripts, but change nothing else unless the
+task says the user agreed; report what is missing as suggestions instead. In capture, open every new
+image and its sidecar afterwards: repair, or remove with "screenify remove" and skip, any image that
+does not show the item and state it is named for. Stop and report a blocker once instead of
+retrying. Report what you did, what was skipped and why, and the environment suggestions.
 """
 `;
 }

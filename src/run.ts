@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { Browser } from 'playwright-core';
 import { ensureApp } from './app.js';
@@ -12,7 +12,7 @@ import { loadManifest, saveManifest, type Manifest } from './manifest.js';
 import { flowBase, recipePath, resolveViewport, screenBase, slug, viewportLabel, type ScreenKey, type ViewportSpec } from './naming.js';
 import { findPlanItem, loadPlan, planItemId, savePlan, settleItemStatus, type Plan, type PlanItem } from './plan.js';
 import { loadRecipe, type Recipe } from './recipe.js';
-import { routeMatches, runRecipe, StepError, type Shot } from './runner.js';
+import { replayRecipe, routeMatches, runRecipe, StepError, type Shot } from './runner.js';
 import { scrub } from './secrets.js';
 import { frontMatter } from './sidecar.js';
 import { storePaths, type Store } from './store.js';
@@ -30,7 +30,7 @@ export interface RecipeResult {
   notRun?: boolean;
   /** Store-relative screenshot of the page when a step failed (a `.md` with the same name holds the details). */
   failureShot?: string;
-  /** What the recipe's plan item needs before capture (flags, build channel, seed), for the failure report. */
+  /** The plan item's free-text `requires` note, repeated in the failure report; never acted on. */
   requires?: string[];
   /** Captures this recipe filed earlier but no longer produces; removed from the library. */
   removed?: string[];
@@ -42,6 +42,11 @@ export interface RunRecipesOptions {
   baseUrl?: string;
   /** Lets `writes: true` recipes run for this call (the agent confirmed the database is disposable). */
   allowWrites?: boolean;
+  /**
+   * File the shots that passed every check even when others in the recipe failed (for repairing a
+   * recipe state by state). The result still fails; captures this recipe no longer produces are kept.
+   */
+  keepPassing?: boolean;
   log?: (line: string) => void;
 }
 
@@ -85,7 +90,8 @@ function pathMismatch(store: Store, relPath: string): string[] {
 /**
  * Finds a recipe by path (absolute, cwd-relative or store-relative) or by a suffix such as
  * `tasks/create-task`. A recipe outside the store is copied to its canonical place under
- * `recipes/` so refresh can replay it, and the copy is reported as a warning.
+ * `recipes/` so refresh can replay it, and the copy is reported as a warning; when a different
+ * recipe is already stored there, it is refused, so an edited scratch copy never silently loses.
  */
 export function locateRecipe(store: Store, ref: string, cwd: string): LocatedRecipe {
   const candidates = [isAbsolute(ref) ? ref : resolve(cwd, ref), join(store.dir, ref)];
@@ -99,8 +105,15 @@ export function locateRecipe(store: Store, ref: string, cwd: string): LocatedRec
     }
     const recipe = loadRecipe(real);
     const target = recipePath(recipe.platform, recipe.feature, recipe.name);
-    mkdirSync(dirname(join(store.dir, target)), { recursive: true });
-    copyFileSync(real, join(store.dir, target));
+    const stored = join(store.dir, target);
+    if (existsSync(stored)) {
+      if (readFileSync(stored).equals(readFileSync(real))) return { path: target, warnings: [] };
+      throw new Error(
+        `screenify-out/${target} already exists and differs from ${ref}. Refresh replays the stored recipe, so edit that one (recipes live only under screenify-out/recipes/), or delete it first to replace it.`,
+      );
+    }
+    mkdirSync(dirname(stored), { recursive: true });
+    copyFileSync(real, stored);
     return { path: target, warnings: [`copied ${ref} to screenify-out/${target}; refresh replays that copy, so edit it there from now on`] };
   }
   const wanted = ref.replace(/\.json$/, '');
@@ -181,7 +194,9 @@ function authViewport(recipe: Recipe) {
  */
 async function signIn(ctx: BatchContext, recipe: Recipe, relRecipe: string): Promise<string> {
   const state = authStatePath(ctx.store, recipe.platform, recipe.name);
-  mkdirSync(dirname(state), { recursive: true });
+  // A saved session is a live login: the folder is the owner's only (0700), the file 0600 (runner).
+  mkdirSync(dirname(state), { recursive: true, mode: 0o700 });
+  chmodSync(dirname(state), 0o700);
   rmSync(state, { force: true });
   try {
     const baseUrl = ctx.opts.baseUrl ?? ctx.config.baseUrl;
@@ -272,11 +287,22 @@ interface BatchContext {
   signedIn: Map<string, string>;
 }
 
-/** Every shot of one recipe at one viewport, with pixel hashes; nothing is filed yet. */
+/** Every shot of one recipe at one viewport, with pixel hashes and the failures met; nothing is filed yet. */
 interface ViewportShots {
   vlabel: string;
   shots: Shot[];
   hashes: string[];
+  failures: StepError[];
+}
+
+/** A recipe that failed after filing the shots that passed (`keepPassing`). */
+class PartialRunError extends Error {
+  constructor(
+    readonly result: RecipeResult,
+    readonly failure: StepError,
+  ) {
+    super(result.error);
+  }
 }
 
 /** One screen image a run is about to file. */
@@ -289,15 +315,17 @@ interface PendingScreen {
 
 async function shootViewport(ctx: BatchContext, recipe: Recipe, item: PlanItem | undefined, spec: ViewportSpec, storageState?: string): Promise<ViewportShots> {
   const viewport = resolveViewport(spec);
-  const shots = await runRecipe(ctx.browser, recipe, {
+  const opts = {
     baseUrl: ctx.opts.baseUrl ?? ctx.config.baseUrl,
     viewport,
     theme: recipe.theme,
     route: recipe.kind === 'screen' ? item?.route : undefined,
     hide: ctx.config.hide,
     storageState,
-  });
-  return { vlabel: viewportLabel(viewport), shots, hashes: await Promise.all(shots.map((s) => pixelHash(s.png))) };
+  };
+  const { shots, failures } = await replayRecipe(ctx.browser, recipe, opts, !!ctx.opts.keepPassing);
+  if (failures.length && !ctx.opts.keepPassing) throw failures[0];
+  return { vlabel: viewportLabel(viewport), shots, hashes: await Promise.all(shots.map((s) => pixelHash(s.png))), failures };
 }
 
 function pendingScreens(recipe: Recipe, runs: ViewportShots[]): PendingScreen[] {
@@ -311,33 +339,43 @@ function pendingScreens(recipe: Recipe, runs: ViewportShots[]): PendingScreen[] 
 }
 
 /**
- * Fails a screen run whose images repeat: two images this run produces with identical pixels, or one
- * identical to a capture that stays in the library. Excluded are exactly the ids this run writes and
- * the captures it replaces (`replaced`), so re-filing an image, even one first filed by `add`, never
- * collides with itself.
+ * Why a screen image cannot be filed, or null: it repeats an earlier image of this run, or a capture
+ * that stays in the library. Excluded are exactly the ids this run writes and the captures it
+ * replaces (`replaced`), so re-filing an image, even one first filed by `add`, never collides with itself.
  */
-function checkScreenDuplicates(screens: PendingScreen[], manifest: Manifest, replaced: Set<string>): void {
+function duplicateProblem(screens: PendingScreen[], i: number, manifest: Manifest, replaced: Set<string>): string | null {
   const label = (p: PendingScreen) => `${p.key.screen} ${p.key.state}${screens.some((o) => o.key.viewport !== p.key.viewport) ? ` (${p.key.viewport})` : ''}`;
-  const writing = new Set(screens.map((p) => p.id));
-  screens.forEach((p, i) => {
-    const j = screens.findIndex((o) => o.hash === p.hash);
-    if (j < i) {
-      throw new StepError(`${label(screens[j])} and ${label(p)} are the same image (steps ${screens[j].shot.step} and ${p.shot.step}); the step between them did not change the page`, p.shot.step, p.shot.png);
-    }
-    const other = Object.values(manifest.captures).find((c) => c.hash === p.hash && !writing.has(c.id) && !replaced.has(c.id));
-    if (other) throw new StepError(`${label(p)} is the same image as ${other.id} (step ${p.shot.step})`, p.shot.step, p.shot.png);
-  });
+  const p = screens[i];
+  const j = screens.findIndex((o) => o.hash === p.hash);
+  if (j < i) return `${label(screens[j])} and ${label(p)} are the same image (steps ${screens[j].shot.step} and ${p.shot.step}); the step between them did not change the page`;
+  const writing = new Set(screens.map((o) => o.id));
+  const other = Object.values(manifest.captures).find((c) => c.hash === p.hash && !writing.has(c.id) && !replaced.has(c.id));
+  return other ? `${label(p)} is the same image as ${other.id} (step ${p.shot.step})` : null;
 }
 
-/** Fails a flow whose frames repeat: a step that changed nothing visible is not a step of the flow. */
-async function checkFlowFrames(recipe: Recipe, run: ViewportShots): Promise<void> {
-  run.hashes.forEach((h, i) => {
-    const j = run.hashes.indexOf(h);
+/** Why a flow cannot be filed, or null: two identical frames mean a step changed nothing visible. */
+function frameProblem(recipe: Recipe, run: ViewportShots): StepError | null {
+  for (let i = 0; i < run.hashes.length; i++) {
+    const j = run.hashes.indexOf(run.hashes[i]);
     if (j < i) {
       const [a, b] = [run.shots[j], run.shots[i]];
-      throw new StepError(`${recipe.name} frames ${j + 1} ("${a.caption}") and ${i + 1} ("${b.caption}") are the same image (${run.vlabel}); the steps between them did not change the page`, b.step, b.png);
+      return new StepError(`${recipe.name} frames ${j + 1} ("${a.caption}") and ${i + 1} ("${b.caption}") are the same image (${run.vlabel}); the steps between them did not change the page`, b.step, b.png);
     }
-  });
+  }
+  return null;
+}
+
+/**
+ * Fails a screen recipe whose shot reaches a state the plan marks `writes` (it changes data or
+ * settings) unless the recipe itself says `"writes": true`, so the writes gate applies to it.
+ */
+function checkWritingStates(recipe: Recipe, item: PlanItem | undefined): void {
+  if (recipe.kind !== 'screen' || recipe.writes || !item) return;
+  const writing = new Set(item.states.filter((st) => st.writes).map((st) => st.name));
+  const hit = recipe.steps.flatMap((st) => ('shot' in st && (!st.shot.screen || slug(st.shot.screen) === item.name) && writing.has(slug(st.shot.state ?? 'default')) ? [slug(st.shot.state ?? 'default')] : []));
+  if (hit.length) {
+    throw new Error(`state ${[...new Set(hit)].join(', ')} changes data or settings (the plan marks it "writes"); set "writes": true on the recipe so it runs only where writes are allowed, and put the setting back afterwards`);
+  }
 }
 
 /** The plan item a screen shot belongs to: the recipe's item for its own screen, else the item named after the shot's screen. */
@@ -391,35 +429,56 @@ async function runOne(ctx: BatchContext, relRecipe: string): Promise<RecipeResul
   const viewports = viewportsFor(recipe, config);
   const storageState = await ensureAuth(ctx, recipe);
   const item = planItemFor(plan, recipe);
-  // Every viewport is shot and checked before anything is filed, so a failing recipe files nothing.
+  checkWritingStates(recipe, item);
+  // Every viewport is shot and checked before anything is filed, so a failing recipe files nothing
+  // (with keepPassing, only the shots that passed every check are filed).
   const runs: ViewportShots[] = [];
   for (const spec of viewports) runs.push(await shootViewport(ctx, recipe, item, spec, storageState));
-  const screens = recipe.kind === 'screen' ? pendingScreens(recipe, runs) : [];
-  const ids = new Set(recipe.kind === 'screen' ? screens.map((p) => p.id) : flowIds(recipe, runs));
+  const failures = runs.flatMap((r) => r.failures);
+  const allScreens = recipe.kind === 'screen' ? pendingScreens(recipe, runs) : [];
+  const ids = new Set(recipe.kind === 'screen' ? allScreens.map((p) => p.id) : flowIds(recipe, runs));
   const replaced = new Set(Object.values(manifest.captures).filter((c) => c.recipe === relRecipe && !ids.has(c.id)).map((c) => c.id));
-  if (recipe.kind === 'screen') checkScreenDuplicates(screens, manifest, replaced);
-  else for (const r of runs) await checkFlowFrames(recipe, r);
-  const filed = await fileShots(ctx, recipe, relRecipe, item, runs, screens);
+  const screens = allScreens.filter((p, i) => {
+    const problem = duplicateProblem(allScreens, i, manifest, replaced);
+    if (problem) failures.push(new StepError(problem, p.shot.step, p.shot.png));
+    return !problem;
+  });
+  const flowRuns = runs.filter((r) => {
+    if (recipe.kind !== 'flow' || r.failures.length) return false;
+    const problem = frameProblem(recipe, r);
+    if (problem) failures.push(problem);
+    return !problem;
+  });
+  if (failures.length && !opts.keepPassing) throw failures[0];
+  const filed = await fileShots(ctx, recipe, relRecipe, item, flowRuns, screens);
   // Captures this recipe filed before but no longer produces (a renamed state, a dropped viewport,
-  // an app-default capture now theme-forced) would sit beside the new ones looking current: remove them.
-  for (const id of replaced) removeCapture(store, manifest, manifest.captures[id]);
-  for (const owner of new Set([...filed.map((f) => f.item), ...plan.items.filter((i) => i.captures.some((c) => replaced.has(c)))])) {
+  // an app-default capture now theme-forced) would sit beside the new ones looking current: remove
+  // them, but only after a complete run.
+  const removed = failures.length ? new Set<string>() : replaced;
+  for (const id of removed) removeCapture(store, manifest, manifest.captures[id]);
+  for (const owner of new Set([...filed.map((f) => f.item), ...plan.items.filter((i) => i.captures.some((c) => removed.has(c)))])) {
     if (!owner) continue;
-    owner.captures = [...new Set([...owner.captures.filter((c) => !replaced.has(c)), ...filed.filter((f) => f.item === owner).map((f) => f.id)])].sort();
+    owner.captures = [...new Set([...owner.captures.filter((c) => !removed.has(c)), ...filed.filter((f) => f.item === owner).map((f) => f.id)])].sort();
     settleItemStatus(owner, manifest);
   }
-  return { recipe: relRecipe, ok: true, captures: filed.map((f) => f.id), removed: replaced.size ? [...replaced].sort() : undefined };
+  const result: RecipeResult = { recipe: relRecipe, ok: !failures.length, captures: filed.map((f) => f.id), removed: removed.size ? [...removed].sort() : undefined };
+  if (failures.length) {
+    result.error = failures.map((f) => f.message).join('\n');
+    throw new PartialRunError(result, failures[0]);
+  }
+  return result;
 }
 
-/** Writes the page-at-failure image and a sidecar with the recipe, step, error and final URL (redacted). */
+/** Writes the page-at-failure image and a sidecar with the recipe, step, error, final URL and accessibility outline (scrubbed). */
 function recordFailure(store: Store, result: RecipeResult, err: StepError): void {
   result.failureShot = `.failures/${slug(result.recipe.replace(/\.json$/, ''), 120)}.png`;
   if (err.screenshot) writeFileAtomic(join(store.dir, result.failureShot), err.screenshot);
   const fm = frontMatter({ recipe: result.recipe, step: err.step, url: err.url ?? undefined, alerts: err.alerts, failed_at: new Date().toISOString() });
-  writeFileAtomic(join(store.dir, result.failureShot.replace(/\.png$/, '.md')), scrub(`${fm}\n\n## Error\n\n\`\`\`text\n${result.error}\n\`\`\`\n`));
+  const outline = err.aria ? `\n## Accessibility outline at the failure\n\nUse it to find a locator that matches.\n\n\`\`\`yaml\n${err.aria}\n\`\`\`\n` : '';
+  writeFileAtomic(join(store.dir, result.failureShot.replace(/\.png$/, '.md')), scrub(`${fm}\n\n## Error\n\n\`\`\`text\n${result.error}\n\`\`\`\n${outline}`));
 }
 
-/** What a failed recipe's plan item says it needs, so the report can say "needs alpha channel". */
+/** The free-text `requires` note of a failed recipe's plan item, shown in the failure report (never acted on). */
 function requiresFor(ctx: BatchContext, relRecipe: string): string[] | undefined {
   try {
     const item = planItemFor(ctx.plan, loadRecipe(join(ctx.store.dir, relRecipe)));
@@ -461,8 +520,9 @@ export async function runRecipes(store: Store, recipes: string[], opts: RunRecip
         log(`Running ${r}`);
         results.push(await runOne(ctx, r));
       } catch (err) {
-        const result: RecipeResult = { recipe: r, ok: false, captures: [], error: scrub((err as Error).message), requires: requiresFor(ctx, r) };
-        const step = err instanceof AuthError ? err.failure : err;
+        const partial = err instanceof PartialRunError ? err.result : null;
+        const result: RecipeResult = { ...(partial ?? { recipe: r, ok: false, captures: [] }), error: scrub((err as Error).message), requires: requiresFor(ctx, r) };
+        const step = err instanceof AuthError || err instanceof PartialRunError ? err.failure : err;
         if (step instanceof StepError) recordFailure(store, result, step);
         if (err instanceof AuthError) stopped = `the sign-in failed in ${r}; fix the environment, then run again`;
         results.push(result);

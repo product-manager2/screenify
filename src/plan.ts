@@ -11,6 +11,8 @@ export interface PlanState {
   name: string;
   /** One line telling the capture agent how to reach this state. */
   how: string;
+  /** True when reaching the state changes data or settings; recipes shooting it must say `"writes": true`. */
+  writes?: boolean;
 }
 
 /** One thing to capture, written by the discovery agent: a screen with its states, or a small flow. */
@@ -37,17 +39,23 @@ export interface PlanItem {
   writes: boolean;
   /** Repo-relative files that actually shape this screen or flow; staleness checks these. */
   sources: string[];
-  /** Anything the capture agent needs: seed data, feature flag, account role. */
+  /** Discovery's note for capture: anything about reaching the item the fields above do not say. */
   note?: string;
   /** Account or role the item must be captured as (`member`, `admin`, `guest`). */
   auth?: string;
-  /** Environment the item needs before capture: feature flags, build channel, seed data ("alpha channel"). */
+  /**
+   * Free text from discovery naming what the user's environment must provide for the item to show
+   * ("sample records in the list", "the reports feature turned on"). Shown and reported; Screenify
+   * never acts on it.
+   */
   requires: string[];
   status: 'pending' | 'captured' | 'skipped';
   /** Manifest capture ids produced for this item. */
   captures: string[];
   /** States deliberately not captured, with the reason (`plan done --skip-state`). Kept across imports. */
   skippedStates: Record<string, string>;
+  /** Capture's own note (why the item was skipped, an image removed); kept apart from discovery's `note`. */
+  captureNote?: string;
 }
 
 /** `plan.json`: the checklist the discovery agent wrote, with capture status per item. */
@@ -128,7 +136,7 @@ export function parsePlanItem(raw: any, where: string): { item?: PlanItem; error
     errors.push(`${where}: "sources" must be repo-relative paths`);
   }
   if (raw.requires !== undefined && !(Array.isArray(raw.requires) && raw.requires.every(str))) {
-    errors.push(`${where}: "requires" must list what capture needs first, e.g. ["alpha build channel", "a workspace with goals"]`);
+    errors.push(`${where}: "requires" must list in words what the environment must provide, e.g. ["sample records in the list"]`);
   }
   const states: PlanState[] = [];
   if (kind === 'screen') {
@@ -136,7 +144,8 @@ export function parsePlanItem(raw: any, where: string): { item?: PlanItem; error
     else
       raw.states.forEach((s: any, n: number) => {
         if (!s || !str(s.name) || !str(s.how)) errors.push(`${where}: states[${n}] needs "name" and a one-line "how"`);
-        else states.push({ name: slug(s.name), how: s.how.trim() });
+        else if (s.writes !== undefined && typeof s.writes !== 'boolean') errors.push(`${where}: states[${n}] "writes" must be true or false`);
+        else states.push({ name: slug(s.name), how: s.how.trim(), ...(s.writes ? { writes: true } : {}) });
       });
   }
   let steps: string[] = [];
@@ -200,11 +209,14 @@ export interface ImportReport {
   vanished: string[];
 }
 
-const content = (i: PlanItem) => JSON.stringify({ ...i, status: undefined, captures: undefined, skippedStates: undefined });
+const content = (i: PlanItem) => JSON.stringify({ ...i, status: undefined, captures: undefined, skippedStates: undefined, captureNote: undefined });
 
-/** Carries what capture recorded (status, captures, skipped states) from the stored item onto a re-imported one. */
+/**
+ * Carries what capture recorded (status, captures, skipped states, capture note) from the stored
+ * item onto a re-imported one. The imported item never brings any of these: they are not input.
+ */
 function keepCaptureState(item: PlanItem, prev: PlanItem | undefined): PlanItem {
-  return prev ? { ...item, status: prev.status, captures: prev.captures, skippedStates: prev.skippedStates } : item;
+  return prev ? { ...item, status: prev.status, captures: prev.captures, skippedStates: prev.skippedStates, captureNote: prev.captureNote } : item;
 }
 
 /**
@@ -305,7 +317,7 @@ export interface DoneOptions {
   skip?: boolean;
   /** Skip these states of a screen. */
   skipStates?: string[];
-  /** The reason; required with `skipStates`. */
+  /** The reason, kept as the item's capture note (discovery's `note` is never touched); required with skips. */
   note?: string;
 }
 
@@ -325,7 +337,7 @@ export function markDone(plan: Plan, manifest: Manifest, ref: string, opts: Done
     settleItemStatus(item, manifest);
     return item;
   }
-  if (opts.note) item.note = opts.note;
+  if (opts.note) item.captureNote = opts.note;
   if (opts.skip) {
     item.status = 'skipped';
     return item;

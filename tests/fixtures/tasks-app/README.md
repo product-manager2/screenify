@@ -8,3 +8,4 @@ password in `FIXTURE_PASSWORD` (default "secret") and shows an alert otherwise.
 session. /settings scrolls an inner panel and shows a DEV badge (class `dev-badge`).
 /auth/magic/<token> is a one-time sign-in link: `good-token` signs in, any other token shows the sign-in
 page with an expired-link alert at the link's own URL. /settings shows "Wide layout" only above 600px.
+/ has two buttons whose names overlap ("Filters" and "Open filters") for exact-match locators.

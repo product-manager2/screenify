@@ -41,9 +41,11 @@ plan with `screenify plan import`. Each item carries:
 - `sources`: only the files that shape that screen or flow, never the app shell or shared
   design-system files. Staleness checks exactly these, so editing one component marks only the
   screens that list it.
-- `auth`: the account or role to capture as; `requires`: what the environment must provide first
-  (a feature flag, a build channel, seed data), so capture can prepare it and report "needs the
-  alpha channel" instead of filing a redirect.
+- `auth`: the account or role to capture as; `requires`: a free-text note of what the user's
+  environment must provide for the item to show ("sample records in the list"). It is shown in
+  `plan show`, `status`, INDEX and failure reports; Screenify never acts on it.
+- A state can be marked `writes` when reaching it changes data or settings; a recipe that shoots it
+  must say `"writes": true`, so it runs only where writes are allowed.
 - `note`: anything else capture needs to know.
 
 `plan import` rejects a source path that does not exist in the checkout.
@@ -107,8 +109,8 @@ screenify-out/
   flows/<platform>/<feature>/<flow>--<viewport>--<theme>[--part-N].png             (+ .md)
   flows/<platform>/<feature>/<flow>--<viewport>--<theme>--frames/NN-<caption>.png  full-resolution frames
   boards/<title>.png                ad hoc sheets from `screenify board`
-  .auth/                            saved logins (never listed in the index)
-  .failures/                        the page when a recipe failed (.png) and the error, final URL and alert text (.md)
+  .auth/                            saved logins, owner-only (folder 0700, files 0600); never listed in the index
+  .failures/                        the page when a recipe failed (.png); error, final URL, alert text and accessibility outline (.md)
 ```
 
 Each sidecar starts with YAML front matter (feature, screen, state, platform, viewport, theme,
@@ -151,11 +153,14 @@ replays it with `playwright-core`. Because recipes are stored, a refresh needs n
 ```
 
 Steps: `goto`, `click`, `fill`, `press`, `select`, `hover`, `waitFor`, `wait`, `shot`. Locators:
-role and name, text, label, test id, or CSS. `fill` values and `goto` targets support `${ENV_VAR}`
+role and name, text, label, test id, or CSS; names and text match as substrings unless
+`"exact": true`. Recipes live in `screenify-out/recipes/`; `run` copies one from elsewhere in, and
+refuses when a different stored copy already exists. `fill` values and `goto` targets support `${ENV_VAR}`
 (a `goto` that reads the environment must stay on the app's origin). Kinds: `screen` (each shot is a
 state), `flow` (each shot is a numbered frame and needs a `caption`) and `auth` (signs in once and
 saves the session for recipes that say `"auth": "<name>"`). Every shot carries `shows`, the agent's
-one line on what the image shows. The full format is in
+one line on what the image shows, written after looking at it (a `shows` that only repeats the
+screen and state names is rejected). The full format is in
 [`skill/agents/screenify-capture.md`](skill/agents/screenify-capture.md).
 
 ### What the CLI checks, and what it leaves to the agent
@@ -169,7 +174,10 @@ The CLI does only deterministic work. Before filing a shot it checks:
   so do two identical frames in one flow.
 - **Nothing filed on failure.** Every viewport is shot and checked before anything is filed. A
   recipe owns what it filed: captures it no longer produces (a renamed state, a dropped viewport,
-  a newly forced theme) are removed when it next succeeds.
+  a newly forced theme) are removed when it next succeeds. While repairing, `run --keep-passing`
+  files the shots that passed every check and lists them, and still fails.
+- **Failures say where the page went.** A failed step reports "page is on /tasks (expected /goals)"
+  after a redirect, and the failure sidecar holds the page's accessibility outline.
 - **Readiness is explicit.** A shot runs right after the recipe's preceding `waitFor` (and web fonts);
   there is no network-idle guess, and `doctor` warns about shots without a `waitFor`.
 - **Sign-in.** Each run signs in once afresh (saved sessions may have expired). A failed sign-in, or
@@ -180,11 +188,26 @@ The CLI does only deterministic work. Before filing a shot it checks:
   with a `commit` or `sha` field (7 to 40 hex digits), or a plain-text body that is only the hash.
 
 Every image is captured with reduced motion, frozen animations and a hidden caret; `config.json`
-`hide` lists CSS selectors (dev overlays such as `nextjs-portal`) hidden in every shot, and a shot's
-`scrollContainer` expands an inner scrolling panel so a long screen is not cut at the viewport.
-Judgement stays with the agent: the capture agent prepares the environment (data, flags, theme),
-then opens every new image and its sidecar to confirm it shows the item and state it is named for,
-repairing or skipping any that does not.
+`hide` lists CSS selectors hidden in every shot (one rule each, so one bad selector cannot disable
+the rest; `doctor` and `run` warn about selectors that do not parse), and a shot's `scrollContainer`
+expands an inner scrolling panel so a long screen is not cut at the viewport. To hide an overlay the
+app draws over content (a dev badge, a toast, a chat bubble, a cookie banner, a floating bar), find
+it in a sidecar's accessibility outline, read the app's code for its element, class or `data-`
+attribute, and add that selector: `".toast"`, `"[data-chat-launcher]"`, or `"nextjs-portal"` for a
+Next.js dev build.
+Judgement stays with the agent: the capture agent opens every new image and its sidecar to confirm
+it shows the item and state it is named for, repairing it, or removing it (`screenify remove`) and
+skipping the state with the reason.
+
+### Your environment stays yours
+
+Accounts, sample data, workspaces or tenants, feature switches, release channels and app settings
+differ in every codebase, and Screenify does not model, switch or seed any of them. The capture
+agent starts the app with your repo's own scripts and nothing more. When an image shows the
+environment is missing something (a "filled" state with no data, a screen that is not available to
+the account, the wrong workspace), it reports a suggestion, and the skill asks you once, in one
+batch: "8 filled states need sample data: shall I add some with your seed script?". The agent acts
+only on what you agree to; everything else stays skipped with its reason.
 
 ## Commands
 
@@ -194,9 +217,10 @@ repairing or skipping any that does not.
 | `discover` | Prints the discovery agent's brief and, when a plan exists, the files changed since its commit and the items they touch |
 | `plan import <file\|->` | Merges the agent's plan JSON by id; capture status survives, items left out are reported |
 | `plan show [--platform] [--feature] [--id] [--pending]` · `plan add` · `plan remove` | Read and edit the plan one item at a time |
-| `plan done <id>` | Marks an item captured; refused while a state has no capture. `--skip-state <state> --note` or `--skip --note` record why something is not captured |
-| `run <recipe…>` | Replays recipes, checks each shot and files the captures |
+| `plan done <id>` | Marks an item captured; refused while a state has no capture. `--skip-state <state> --note` or `--skip --note` record why something is not captured, as the item's capture note (discovery's `note` is never overwritten, and `plan import` never takes capture fields from its input) |
+| `run <recipe…> [--keep-passing]` | Replays recipes, checks each shot and files the captures |
 | `add <png>` | Files an image captured elsewhere (Flutter, simulators, desktop apps) under the same rules |
+| `remove <capture> --note` | Takes a rejected image out of the library (inside `screens/` and `flows/` only); its state is pending again and the reason is kept as the item's capture note |
 | `board <capture…> --title` | Composes chosen captures into one captioned sheet |
 | `status` | Captures whose source files changed since their commit, and plan items with captured/total states |
 | `refresh [--all]` | Replays the recipes of stale captures; exits 1 listing failed recipes |

@@ -75,7 +75,7 @@ describe.skipIf(!browser)('secrets, filing and sign-in with headless Chrome', ()
   it('scrubs a token in a link path from errors, JSON, stdout, stderr and failure files', async () => {
     process.env.LOGIN_URL = `${base()}/auth/magic/abc123token`;
     authRecipe([{ goto: '${LOGIN_URL}' }, { waitFor: { role: 'heading', name: 'Tasks' }, timeout: 1500 }]);
-    const account = recipe('account', { auth: 'login', steps: [{ goto: '/account' }, { waitFor: { role: 'heading', name: 'Your account' } }, { shot: { shows: 'Account' } }] });
+    const account = recipe('account', { auth: 'login', steps: [{ goto: '/account' }, { waitFor: { role: 'heading', name: 'Your account' } }, { shot: { shows: 'Account page saying signed in' } }] });
     let out = '';
     let err = '';
     const code = await main(['run', account, '--json'], { cwd: repo, env: {}, out: (t) => (out += t), err: (t) => (err += t) });
@@ -140,7 +140,7 @@ describe.skipIf(!browser)('secrets, filing and sign-in with headless Chrome', ()
   });
 
   it('never counts an image as a duplicate of itself, and removes captures a recipe no longer produces', async () => {
-    const steps = (state: string) => [{ goto: '/' }, { waitFor: { role: 'heading' } }, { shot: { state, shows: 'Home' } }];
+    const steps = (state: string) => [{ goto: '/' }, { waitFor: { role: 'heading' } }, { shot: { state, shows: 'Welcome heading with a link to the tasks' } }];
     const r = recipe('home', { steps: steps('default') });
     const [first] = await runRecipes(store, [r]);
     expect(first.error).toBeUndefined();
@@ -148,7 +148,7 @@ describe.skipIf(!browser)('secrets, filing and sign-in with headless Chrome', ()
     // The same image re-filed by `add` under the same id: the next recipe run rewrites that id, so it is no duplicate.
     const copy = join(repo, 'home.png');
     copyFileSync(join(store.dir, `${id}.png`), copy);
-    await addImage(store, { png: copy, platform: 'web', feature: 'safe', screen: 'home', state: 'default', viewport: 'desktop-1440x900', shows: 'Home' });
+    await addImage(store, { png: copy, platform: 'web', feature: 'safe', screen: 'home', state: 'default', viewport: 'desktop-1440x900', shows: 'Welcome heading with a link to the tasks' });
     expect(loadManifest(store).captures[id].recipe).toBeUndefined();
     const [again] = await runRecipes(store, [r]);
     expect(again.error).toBeUndefined();
@@ -198,7 +198,7 @@ describe.skipIf(!browser)('secrets, filing and sign-in with headless Chrome', ()
     expect(ok.error).toBeUndefined();
     expect(await attempts()).toBe(before + 1);
 
-    const orphan = recipe('home', { auth: 'nope', steps: [{ goto: '/' }, { waitFor: { role: 'heading' } }, { shot: { shows: 'Home' } }] });
+    const orphan = recipe('home', { auth: 'nope', steps: [{ goto: '/' }, { waitFor: { role: 'heading' } }, { shot: { shows: 'Welcome heading with a link to the tasks' } }] });
     const [missing, after] = await runRecipes(store, [orphan, account]);
     expect(missing.error).toContain('sign-in "nope" cannot run: auth recipe "nope"');
     expect(after).toMatchObject({ ok: false, notRun: true });

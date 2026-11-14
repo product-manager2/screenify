@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateConfig } from '../src/config.js';
-import { shotsWithoutWait, substituteEnv, validateRecipe, type Recipe } from '../src/recipe.js';
+import { placeholderShows, shotsWithoutWait, substituteEnv, validateRecipe, type Recipe } from '../src/recipe.js';
 import { commitFromBody, routeMatches } from '../src/run.js';
 
 const base = { platform: 'web', feature: 'tasks', name: 'list', kind: 'screen', steps: [{ goto: '/tasks' }, { waitFor: { text: 'Tasks' } }, { shot: { shows: 'Task list' } }] };
@@ -23,7 +23,7 @@ describe('recipes', () => {
   it('requires "shows" on every shot and "caption" on flow shots', () => {
     expect(validateRecipe(withShot({})).join('\n')).toContain('step 2: "shows" must say in one line what the image shows');
     expect(validateRecipe(withShot({ shows: 'List' }, 'flow')).join('\n')).toContain('step 2: a flow shot needs a "caption"');
-    expect(validateRecipe(withShot({ shows: 'List', caption: 'Open the list' }, 'flow'))).toEqual([]);
+    expect(validateRecipe(withShot({ shows: 'Task list with two tasks', caption: 'Open the list' }, 'flow'))).toEqual([]);
     expect(validateRecipe(withShot(null)).join('\n')).toContain('"shot" must be an object');
   });
   it('validates expectUrl, expect and scrollContainer', () => {
@@ -96,5 +96,26 @@ describe('served commit', () => {
     expect(commitFromBody('1731500000')).toBeNull();
     expect(commitFromBody('build 550e8400-e29b-41d4 at 1731500000')).toBeNull();
     expect(commitFromBody('{"commit":"not-a-sha"}')).toBeNull();
+  });
+});
+
+describe('locators and shows', () => {
+  it('validates every step locator, including exact and nth', () => {
+    const steps = (loc: unknown) => ({ ...base, steps: [{ goto: '/' }, { click: loc }, { waitFor: { text: 'x' } }, { shot: { shows: 'A list of three things' } }] });
+    expect(validateRecipe(steps({ role: 'button', name: 'Filters', exact: true }))).toEqual([]);
+    expect(validateRecipe(steps({ text: 'Filters', exact: 'yes' })).join('\n')).toContain('step 2: "click": "exact" must be true or false');
+    expect(validateRecipe(steps({ testId: 'f', exact: true })).join('\n')).toContain('"exact" applies to role, text and label locators only');
+    expect(validateRecipe(steps({ css: '.a', nth: -1 })).join('\n')).toContain('"nth" must be a whole number from 0');
+    expect(validateRecipe(steps({ role: 'button', text: 'x' })).join('\n')).toContain('step 2: "click" must be a locator');
+    expect(validateRecipe({ ...base, steps: [{ goto: '/' }, { waitFor: { url: '/x' } }, { shot: { shows: 'Something real' } }] })).toEqual([]);
+  });
+  it('rejects shows that only restate the plan item', () => {
+    const shot = (shows: string, extra = {}) => validateRecipe({ ...base, steps: [{ goto: '/' }, { waitFor: { text: 'x' } }, { shot: { shows, ...extra } }] }).join('\n');
+    expect(shot('discovery: filled state of task-list')).toContain('only names the screen and state');
+    expect(shot('list default')).toContain('only names the screen and state');
+    expect(shot('Filled', { state: 'filled' })).toContain('only names the screen and state');
+    expect(shot('filled state of list', { state: 'filled' })).toContain('only names the screen and state');
+    expect(shot('Three tasks, one overdue', { state: 'filled' })).toBe('');
+    expect(placeholderShows('Task list with three tasks', 'task-list', 'filled')).toBe(false);
   });
 });

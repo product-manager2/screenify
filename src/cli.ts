@@ -3,7 +3,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { addImage } from './add.js';
+import { addImage, removeImage } from './add.js';
 import { composeAdHocBoard } from './boardcmd.js';
 import { discoverChanges, headCommit, renderDiscover } from './discover.js';
 import { doctor } from './doctor.js';
@@ -40,6 +40,7 @@ Usage: screenify <command> [options]      (screenify <command> --help for one co
   plan show|import|add|remove|done         Read and write the plan (screenify plan --help)
   run <recipe>...            Replay recipes headlessly, check each shot, file the captures
   add <png> ...              File an image captured with another tool (Flutter, simulators, desktop)
+  remove <capture> --note T  Take a rejected image out of the library; its state is pending again
   board <capture|png>... --title T          Compose chosen captures into one captioned sheet
   status [--json]            Stale captures, and plan items with states not yet captured
   refresh [--all]            Replay recipes of stale captures (all with --all); exit 1 on failures
@@ -64,10 +65,18 @@ const COMMAND_HELP: Record<string, string> = {
   screenify plan done <id>              Mark captured; refused while a state has no capture
   screenify plan done <id> --skip --note TEXT                    Skip the whole item
   screenify plan done <id> --skip-state STATE... --note TEXT     Skip states that cannot be captured`,
-  run: `screenify run <recipe>... [--base-url URL] [--allow-writes] [--json]
+  remove: `screenify remove <capture id or path> --note "why it is wrong" [--json]
+  Deletes the capture's image (a flow's boards and frames), sidecar and manifest entry, only inside
+  the library's screens/ and flows/ folders. Its plan item loses it, so the state shows as pending
+  again, and the reason is kept as the item's capture note.`,
+  run: `screenify run <recipe>... [--base-url URL] [--allow-writes] [--keep-passing] [--json]
   Replays recipes headlessly. Each shot must land on its expected URL, pass its "expect" text checks
   and differ from the other images, or the recipe fails with the page-at-failure in .failures/.
-  A failed sign-in stops the batch once; the remaining recipes are reported as not run.`,
+  A failed sign-in stops the batch once; the remaining recipes are reported as not run.
+  --keep-passing files the shots that passed every check even when others failed (the run still
+  exits 1), so a recipe can be repaired state by state; review what it filed.
+  A recipe outside screenify-out/recipes/ is copied in, and refused when a different stored copy
+  with the same platform/feature/name exists.`,
   add: `screenify add <png> --platform P --feature F --shows "what it shows"
            (--screen S [--state S] | --flow F --step N --caption C)
            [--viewport V] [--theme light|dark] [--source FILE]... [--route R] [--text-file FILE]
@@ -140,6 +149,7 @@ function printResults(results: RecipeResult[]): number {
       failed++;
       print(`FAIL ${r.recipe}`);
       print(`  ${r.error?.replace(/\n/g, '\n  ')}`);
+      for (const c of r.captures) print(`  filed anyway (passed every check; review it): ${c}`);
       if (r.requires) print(`  the plan item requires: ${r.requires.join(', ')}; check the environment provides it`);
       if (r.failureShot) print(`  page at failure: screenify-out/${r.failureShot} (details in the .md beside it)`);
     } else if (r.skipped) {
@@ -161,13 +171,14 @@ function describeItem(i: PlanItem, manifest: Manifest): string[] {
   const lines = [`[${i.status}] ${i.id}${i.example ?? i.route ? `  ${i.example ?? i.route}` : ''}${states}${i.writes ? '  (writes data)' : ''}`];
   for (const s of i.states) {
     const mark = cov.captured.includes(s.name) ? 'x' : i.skippedStates[s.name] !== undefined ? '-' : ' ';
-    lines.push(`    [${mark}] state ${s.name}: ${s.how}${i.skippedStates[s.name] ? ` (skipped: ${i.skippedStates[s.name]})` : ''}`);
+    lines.push(`    [${mark}] state ${s.name}${s.writes ? ' (writes)' : ''}: ${s.how}${i.skippedStates[s.name] ? ` (skipped: ${i.skippedStates[s.name]})` : ''}`);
   }
   if (i.steps.length) lines.push(`    steps${i.start ? ` from ${i.start}` : ''}: ${i.steps.join(' → ')}`);
   if (i.auth) lines.push(`    as: ${i.auth}`);
   if (i.requires.length) lines.push(`    requires: ${i.requires.join(', ')}`);
   lines.push(`    sources: ${i.sources.join(', ') || '(none)'}`);
   if (i.note) lines.push(`    note: ${i.note}`);
+  if (i.captureNote) lines.push(`    capture note: ${i.captureNote}`);
   return lines;
 }
 
@@ -353,7 +364,7 @@ async function command(cmd: string, rest: string[], store: Store): Promise<numbe
     case 'plan':
       return planCommand(store, rest);
     case 'run': {
-      const { values, positionals } = parse(rest, { 'base-url': { type: 'string' }, 'allow-writes': { type: 'boolean' } });
+      const { values, positionals } = parse(rest, { 'base-url': { type: 'string' }, 'allow-writes': { type: 'boolean' }, 'keep-passing': { type: 'boolean' } });
       if (!positionals.length) {
         const all = listRecipes(store);
         throw new Error(`give one or more recipes${all.length ? `; available:\n  ${all.join('\n  ')}` : ' (none in screenify-out/recipes/ yet)'}`);
@@ -363,6 +374,7 @@ async function command(cmd: string, rest: string[], store: Store): Promise<numbe
       const results = await runRecipes(store, located.map((l) => l.path), {
         baseUrl: values['base-url'] as string | undefined,
         allowWrites: !!values['allow-writes'],
+        keepPassing: !!values['keep-passing'],
         log: (s) => notice(s),
       });
       if (values.json) {
@@ -406,6 +418,14 @@ async function command(cmd: string, rest: string[], store: Store): Promise<numbe
         text: values['text-file'] ? readFileSync(values['text-file'] as string, 'utf8') : undefined,
       });
       print(values.json ? JSON.stringify({ filed: id }) : `filed ${id}`);
+      return 0;
+    }
+    case 'remove': {
+      const { values, positionals } = parse(rest, { note: { type: 'string' } });
+      if (!positionals[0]) throw new Error('give the capture id or path to remove (from INDEX.md)');
+      const r = removeImage(store, positionals[0], values.note as string);
+      if (values.json) print(JSON.stringify(r));
+      else print(`removed ${r.id}${r.planItem ? `; ${r.planItem} has that state pending again` : ''}`);
       return 0;
     }
     case 'board': {

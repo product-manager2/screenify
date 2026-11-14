@@ -5,6 +5,9 @@ import { describeProbe, ensureApp, probe } from '../src/app.js';
 import { main } from '../src/cli.js';
 import { defaultConfig } from '../src/config.js';
 import { loadPlan } from '../src/plan.js';
+import { loadManifest } from '../src/manifest.js';
+import { existsSync } from 'node:fs';
+import sharp from 'sharp';
 import { locateRecipe } from '../src/run.js';
 import { openStore } from '../src/store.js';
 import { freePort, isolateHome, tempRepo, writeFile } from './helpers.js';
@@ -70,7 +73,7 @@ describe('cli', () => {
   it('warns when a recipe path disagrees with its platform/feature/name, and when it copies one in', () => {
     const repo = tempRepo();
     const { store } = openStore(repo, {});
-    const body = (name: string) => JSON.stringify({ platform: 'web', feature: 'tasks', name, kind: 'screen', viewports: ['desktop'], steps: [{ goto: '/' }, { shot: { shows: 'Home' } }] });
+    const body = (name: string) => JSON.stringify({ platform: 'web', feature: 'tasks', name, kind: 'screen', viewports: ['desktop'], steps: [{ goto: '/' }, { shot: { shows: 'Welcome heading with a link to the tasks' } }] });
     writeFile(join(store.dir, 'recipes/web/tasks/list.json'), body('list'));
     writeFile(join(store.dir, 'recipes/web/other/wrong.json'), body('list'));
     expect(locateRecipe(store, 'recipes/web/tasks/list.json', repo).warnings).toEqual([]);
@@ -79,6 +82,38 @@ describe('cli', () => {
     const copied = locateRecipe(store, 'outside.json', repo);
     expect(copied.path).toBe('recipes/web/tasks/board.json');
     expect(copied.warnings[0]).toContain('copied outside.json to screenify-out/recipes/web/tasks/board.json');
+  });
+
+  it('refuses an outside recipe when a different stored copy exists, and reuses an identical one', () => {
+    const repo = tempRepo();
+    const { store } = openStore(repo, {});
+    const body = (shows: string) => JSON.stringify({ platform: 'web', feature: 'tasks', name: 'list', kind: 'screen', viewports: ['desktop'], steps: [{ goto: '/' }, { shot: { shows } }] });
+    writeFile(join(store.dir, 'recipes/web/tasks/list.json'), body('Stored version of the list'));
+    writeFile(join(repo, 'scratch.json'), body('Edited scratch version'));
+    expect(() => locateRecipe(store, 'scratch.json', repo)).toThrow(/screenify-out\/recipes\/web\/tasks\/list.json already exists and differs from scratch.json/);
+    writeFile(join(repo, 'scratch.json'), body('Stored version of the list'));
+    expect(locateRecipe(store, 'scratch.json', repo)).toEqual({ path: 'recipes/web/tasks/list.json', warnings: [] });
+  });
+
+  it('removes a rejected image, marks its state pending again and keeps the reason', async () => {
+    const repo = tempRepo('tasks-app');
+    const file = join(repo, 'plan-in.json');
+    writeFile(file, JSON.stringify([{ kind: 'screen', feature: 'tasks', name: 'list', states: [{ name: 'filled', how: 'Seed' }], sources: ['pages/tasks.mjs'], note: 'From discovery' }]));
+    await cli(repo, ['plan', 'import', file]);
+    const png = join(repo, 'shot.png');
+    await sharp({ create: { width: 20, height: 20, channels: 3, background: '#abc' } }).png().toFile(png);
+    await cli(repo, ['add', png, '--platform', 'web', '--feature', 'tasks', '--screen', 'list', '--state', 'filled', '--shows', 'Loading skeletons where rows should be']);
+    const { store } = openStore(repo, {});
+    const id = 'screens/web/tasks/list/list--filled--device-20x20--app-default';
+    expect(loadPlan(store).items[0].status).toBe('captured');
+    await expect(cli(repo, ['remove', `screenify-out/${id}.png`])).rejects.toThrow(/--note is required/);
+    const r = await cli(repo, ['remove', `screenify-out/${id}.png`, '--note', 'loading skeletons, not data']);
+    expect(r.out).toContain(`removed ${id}; screen:web:tasks:list has that state pending again`);
+    expect(existsSync(join(store.dir, `${id}.png`))).toBe(false);
+    expect(existsSync(join(store.dir, `${id}.md`))).toBe(false);
+    expect(loadManifest(store).captures[id]).toBeUndefined();
+    expect(loadPlan(store).items[0]).toMatchObject({ status: 'pending', captures: [], note: 'From discovery', captureNote: 'removed filled: loading skeletons, not data' });
+    await expect(cli(repo, ['remove', id, '--note', 'x'])).rejects.toThrow(/no capture/);
   });
 
   it('prints help for one command', async () => {

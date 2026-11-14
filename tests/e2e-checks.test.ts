@@ -82,7 +82,7 @@ describe.skipIf(!browser)('capture checks with headless Chrome', () => {
 
   it('fails two states that are the same image, and an image identical to another capture', async () => {
     const same = recipe('tasks', {
-      steps: [{ goto: '/tasks' }, { waitFor: { text: 'Call the bank' } }, { shot: { state: 'week', shows: 'Week' } }, { shot: { state: 'month', shows: 'Month' } }],
+      steps: [{ goto: '/tasks' }, { waitFor: { text: 'Call the bank' } }, { shot: { state: 'week', shows: 'Task list shown as a week' } }, { shot: { state: 'month', shows: 'Task list shown as a month' } }],
     });
     const [dup] = await runRecipes(store, [same]);
     expect(dup.ok).toBe(false);

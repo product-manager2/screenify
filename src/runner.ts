@@ -3,6 +3,7 @@ import type { Browser, Locator as PwLocator, Page } from 'playwright-core';
 import { slug, type Viewport } from './naming.js';
 import { stepAction, substituteEnv, textList, type Locator, type Recipe, type ShotSpec, type Step } from './recipe.js';
 import { scrub } from './secrets.js';
+import { writeFileAtomic } from './fsutil.js';
 
 /** One `shot` taken while replaying a recipe. */
 export interface Shot {
@@ -50,9 +51,20 @@ export class StepError extends Error {
     readonly screenshot: Buffer | null,
     readonly url: string | null = null,
     readonly alerts: string[] = [],
+    /** The page's accessibility outline at the failure (scrubbed): where working locators are found. */
+    readonly aria: string = '',
   ) {
     super(message);
   }
+}
+
+/** A shot's own check failed (landing URL or expected text); the steps before it ran fine. */
+export class ShotCheckError extends Error {}
+
+/** What one replay produced: the shots that passed, and the failures met on the way. */
+export interface Replay {
+  shots: Shot[];
+  failures: StepError[];
 }
 
 /** Resolves a recipe locator to a Playwright locator. */
@@ -260,7 +272,7 @@ async function takeShot(page: Page, recipe: Recipe, spec: ShotSpec, step: number
   await fontsReady(page);
   const rawText = await page.evaluate(() => document.body?.innerText ?? '').catch(() => '');
   const problems = await shotProblems(page, recipe, spec, opts, rawText);
-  if (problems.length) throw new Error(problems.join('; '));
+  if (problems.length) throw new ShotCheckError(problems.join('; '));
   const restore = spec.scrollContainer ? await expandScrollContainer(page, spec.scrollContainer, timeout) : null;
   let png: Buffer;
   try {
@@ -282,25 +294,51 @@ async function takeShot(page: Page, recipe: Recipe, spec: ShotSpec, step: number
   };
 }
 
-/** Builds the StepError for a failed step: redacted message, page screenshot, final URL and alert text. */
-async function stepFailure(page: Page, step: number, action: string, err: unknown, opts: RunOptions): Promise<StepError> {
+/** The route the page should be on after step `index`: the next shot's expected route. */
+function routeAhead(recipe: Recipe, index: number, opts: RunOptions): string | undefined {
+  for (let i = index; i < recipe.steps.length; i++) {
+    const s = recipe.steps[i];
+    if ('shot' in s) return expectedRoute(recipe, s.shot, opts);
+  }
+  return undefined;
+}
+
+/**
+ * Builds the StepError for a failed step: scrubbed message, page screenshot, final URL, alert text
+ * and accessibility outline. When the page is not on the route the next shot expects, the message
+ * says so ("page is on /tasks (expected /goals)"): a redirect is the usual cause.
+ */
+async function stepFailure(page: Page, recipe: Recipe, index: number, err: unknown, opts: RunOptions): Promise<StepError> {
+  const step = recipe.steps[index];
   const screenshot = await page.screenshot({ animations: 'disabled', style: hideStyle(opts.hide) }).catch(() => null);
   const alerts = await page
     .getByRole('alert')
     .allInnerTexts()
     .then((all) => all.map((a) => scrub(normalise(a))).filter(Boolean))
     .catch(() => [] as string[]);
-  const msg = scrub((err as Error).message.split('\n').slice(0, 6).join('\n'));
-  return new StepError(`step ${step} (${action}) failed: ${msg}`, step, screenshot, scrub(page.url()), alerts);
+  const aria = scrub(await page.locator('body').ariaSnapshot({ timeout: 3000 }).catch(() => ''));
+  let msg = scrub((err as Error).message.split('\n').slice(0, 6).join('\n'));
+  const expected = 'shot' in step ? undefined : routeAhead(recipe, index, opts);
+  const path = (() => {
+    try {
+      return new URL(page.url()).pathname;
+    } catch {
+      return null;
+    }
+  })();
+  if (expected && path && !routeMatches(expected, path)) msg += `\npage is on ${scrub(path)} (expected ${expected})`;
+  return new StepError(`step ${index + 1} (${stepAction(step)}) failed: ${msg}`, index + 1, screenshot, scrub(page.url()), alerts, aria);
 }
 
 /**
- * Replays a recipe at one viewport in a fresh headless context, returning every shot. Each shot is
- * checked first (landing URL, expected text) and fails the run when a check fails. Motion is reduced,
- * animations frozen, the caret hidden and config `hide` selectors hidden in every image. Screen shots
- * default to full page; flow frames default to the viewport so boards line up.
+ * Replays a recipe at one viewport in a fresh headless context. Each shot is checked first (landing
+ * URL, expected text). Motion is reduced, animations frozen, the caret hidden and config `hide`
+ * selectors hidden in every image. Screen shots default to full page; flow frames default to the
+ * viewport so boards line up. With `keepGoing`, a shot whose own check fails is recorded as a
+ * failure and the replay continues; a failing action step still ends it. A saved session is
+ * written readable by the owner only (0600).
  */
-export async function runRecipe(browser: Browser, recipe: Recipe, opts: RunOptions): Promise<Shot[]> {
+export async function replayRecipe(browser: Browser, recipe: Recipe, opts: RunOptions, keepGoing = false): Promise<Replay> {
   const context = await browser.newContext({
     viewport: { width: opts.viewport.width, height: opts.viewport.height },
     deviceScaleFactor: opts.viewport.deviceScaleFactor,
@@ -315,20 +353,30 @@ export async function runRecipe(browser: Browser, recipe: Recipe, opts: RunOptio
   });
   const page = await context.newPage();
   const timeout = opts.timeout ?? 10_000;
-  const shots: Shot[] = [];
+  const replay: Replay = { shots: [], failures: [] };
   try {
     for (let i = 0; i < recipe.steps.length; i++) {
       const step = recipe.steps[i];
       try {
-        if ('shot' in step) shots.push(await takeShot(page, recipe, step.shot, i + 1, opts, timeout));
+        if ('shot' in step) replay.shots.push(await takeShot(page, recipe, step.shot, i + 1, opts, timeout));
         else await runStep(page, step, opts, timeout);
       } catch (err) {
-        throw await stepFailure(page, i + 1, stepAction(step), err, opts);
+        replay.failures.push(await stepFailure(page, recipe, i, err, opts));
+        if (!keepGoing || !(err instanceof ShotCheckError)) break;
       }
     }
-    if (opts.saveStorageState) await context.storageState({ path: opts.saveStorageState });
+    if (opts.saveStorageState && !replay.failures.length) {
+      writeFileAtomic(opts.saveStorageState, JSON.stringify(await context.storageState()), 0o600);
+    }
   } finally {
     await context.close();
   }
+  return replay;
+}
+
+/** Replays a recipe and returns every shot; the first failure is thrown as a StepError. */
+export async function runRecipe(browser: Browser, recipe: Recipe, opts: RunOptions): Promise<Shot[]> {
+  const { shots, failures } = await replayRecipe(browser, recipe, opts);
+  if (failures.length) throw failures[0];
   return shots;
 }

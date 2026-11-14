@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { pixelHash, recordFlow, recordScreen, type FrameInput } from './capture.js';
+import { pixelHash, recordFlow, recordScreen, removeCapture, type FrameInput } from './capture.js';
 import { gitState } from './git.js';
-import { loadManifest, saveManifest } from './manifest.js';
+import { loadManifest, saveManifest, type Capture, type Manifest } from './manifest.js';
 import { flowBase, slug } from './naming.js';
+import { placeholderShows } from './recipe.js';
 import { loadPlan, planItemId, savePlan, settleItemStatus, type Plan } from './plan.js';
 import type { Store } from './store.js';
 import { writeIndex } from './indexfile.js';
@@ -42,6 +43,9 @@ function sourcesFor(own: string[], plan: Plan, planId: string): { sources: strin
  */
 export async function addImage(store: Store, opts: AddOptions): Promise<string> {
   if (!opts.shows?.trim()) throw new Error('--shows is required: one line saying what the image shows, e.g. "Task list with three tasks"');
+  if (placeholderShows(opts.shows, opts.screen ?? opts.flow ?? '', opts.state ?? 'default')) {
+    throw new Error(`--shows ("${opts.shows}") only names the screen and state; describe what the image actually shows, after looking at it`);
+  }
   const png = await sharp(readFileSync(opts.png)).png().toBuffer();
   const meta = await sharp(png).metadata();
   const viewport = opts.viewport ? slug(opts.viewport) : `device-${meta.width}x${meta.height}`;
@@ -90,4 +94,44 @@ export async function addImage(store: Store, opts: AddOptions): Promise<string> 
   saveManifest(store, manifest);
   writeIndex(store);
   return id;
+}
+
+/** What {@link removeImage} took out of the library. */
+export interface Removed {
+  id: string;
+  /** The plan item the capture belonged to, now pending again for that state. */
+  planItem?: string;
+}
+
+/** Finds a capture by id, or by any of its paths (image, board, sidecar), with or without `screenify-out/`. */
+export function findCapture(manifest: Manifest, ref: string): Capture | undefined {
+  const clean = ref.replace(/^(\.\/)?screenify-out\//, '').replace(/\.(png|md)$/, '');
+  return (
+    manifest.captures[clean] ??
+    Object.values(manifest.captures).find((c) => [c.image, c.sidecar, ...(c.boards ?? [])].some((p) => p.replace(/\.(png|md)$/, '') === clean))
+  );
+}
+
+/**
+ * Removes one capture the agent rejected: its image (or a flow's boards and frames), its sidecar and
+ * its manifest entry, only ever inside the library's screens/ and flows/ folders. Its plan item loses
+ * the capture, so that state shows as pending again, and keeps the reason as its capture note.
+ */
+export function removeImage(store: Store, ref: string, note: string): Removed {
+  if (!note?.trim()) throw new Error('--note is required: say why the image is wrong, e.g. "loading skeletons, not data"');
+  const manifest = loadManifest(store);
+  const capture = findCapture(manifest, ref);
+  if (!capture) throw new Error(`no capture "${ref}" in the library (use an id or path from INDEX.md)`);
+  const plan = loadPlan(store);
+  removeCapture(store, manifest, capture);
+  for (const item of plan.items) {
+    if (!item.captures.includes(capture.id) && item.id !== capture.planItem) continue;
+    item.captures = item.captures.filter((c) => c !== capture.id);
+    settleItemStatus(item, manifest);
+    if (item.id === capture.planItem) item.captureNote = `removed ${capture.state ?? capture.name}: ${note.trim()}`;
+  }
+  saveManifest(store, manifest);
+  savePlan(store, plan);
+  writeIndex(store);
+  return { id: capture.id, planItem: capture.planItem };
 }

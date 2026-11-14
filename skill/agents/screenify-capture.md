@@ -14,8 +14,14 @@ a later refresh run with no model at all.
 
 The CLI only does what it can measure: it checks that each shot landed on the expected URL, that
 the `expect` text is (or is not) on the page, and that no two images are identical. Everything that
-needs judgement is yours: preparing the environment, choosing what each shot shows, and looking at
-every image afterwards to confirm it is right.
+needs judgement is yours: writing recipes, choosing what each shot shows, and looking at every image
+afterwards to confirm it is right.
+
+**The app's environment belongs to the user, not to you.** Accounts, sample data, workspaces or
+tenants, feature switches, release channels and app settings differ in every codebase. You may start
+the app with the repo's own scripts, but you do not create accounts, add data, switch features or
+change settings on your own. You notice what the environment is missing and report it as a
+suggestion; the skill asks the user, and you act on a suggestion only when the user has agreed to it.
 
 Run the CLI as `npx screenify <command>` from the repository root. Add `--json` to parse output
 (notices go to stderr, so stdout is only JSON). `npx screenify <command> --help` shows one command.
@@ -24,50 +30,51 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
 
 - **Headless only.** Never open a visible browser window or any GUI app. Never drive a browser
   yourself, through any tool: write a recipe and `npx screenify run` it.
+- **Recipes live only in `screenify-out/recipes/<platform>/<feature>/<name>.json`.** Write and edit
+  them there; refresh replays the stored file. `run` refuses a recipe from elsewhere when a different
+  stored copy already exists.
 - **No secrets in recipes.** Put credentials and one-time sign-in links in environment variables and
   write `"value": "${APP_PASSWORD}"` or `{ "goto": "${LOGIN_URL}" }`. A `goto` that reads the
   environment must stay on the app's own origin.
 - **Writes need a disposable database.** A recipe with `"writes": true` (it creates, edits or deletes
-  data) runs only after you have confirmed from the repo's setup that the database is local or
-  disposable; then set `"writesAllowed": true` in `screenify-out/config.json`. Otherwise capture the
-  read-only screens and skip each writing flow with the reason:
+  data, or reaches a state the plan marks `writes`) runs only after you have confirmed from the
+  repo's setup that the database is local or disposable; then set `"writesAllowed": true` in
+  `screenify-out/config.json`. Put a changed setting back at the end of the recipe. Otherwise
+  capture the read-only screens and skip the rest with the reason:
   `npx screenify plan done <id> --skip --note "shared database"`.
 - **Never leave a mislabelled image.** An image that does not show the item and state its name says
-  is worse than no image: repair the recipe or skip the state with the reason.
-- Do not edit images, `manifest.json`, `plan.json` or `INDEX.md` by hand; the CLI owns them. If the
-  plan is wrong (a route that does not exist, a missing state), say so in your report instead of
-  changing it.
+  is worse than no image: repair the recipe, or remove the image and skip the state with the reason.
+- Do not edit images, `manifest.json`, `plan.json` or `INDEX.md` by hand; the CLI owns them
+  (`screenify remove` takes an image out). If the plan is wrong (a route that does not exist, a
+  missing state), say so in your report instead of changing it.
 
 ## Steps
 
-1. **Prepare the environment before writing any recipe.** Get the app running locally with seed data,
-   using the repo's own README, scripts, docker-compose, `.env.example` and seed files; if no seed or
-   start script exists, create a minimal one in the repo and say so. Then:
-   - **Data for every state.** A "filled" state needs an account that has that data; seed it or pick
-     an account that has it. An "empty" state needs one that does not.
-   - **What `requires` names.** For each item, `plan show` lists `requires` (a feature flag, a build
-     or release channel, seed data) and `as:` (the account or role). Switch the flag or channel and
-     use that account before capturing it. A gated screen captured without its gate shows a redirect
-     or a "not available" toast instead.
+1. **Get the app running and look at the environment, without changing it.** Start the app with the
+   repo's own README, scripts, docker-compose, `.env.example` and seed files, as the repo intends. Then
+   check what the plan needs against what is there, and write down every gap as a suggestion for the
+   user instead of fixing it:
+   - **Data for each state.** A "filled" state needs records to show; an "empty" one needs none. If
+     the account you can use has no records, note: "filled states need sample data; the repo has a
+     seed script at `<path>`".
+   - **What the plan says an item needs.** `plan show` lists each item's `requires` (discovery's free
+     text about what must be in place) and `as:` (the account or role). If you cannot tell that the
+     environment provides it, note it.
    - **Theme.** A recipe's `"theme"` forces the browser's color-scheme media query. If the app keeps
-     its own theme preference instead (a setting, a stored preference), set that preference for the
-     capture account so the image matches the label. Without `"theme"` the browser reports its fixed
-     default preference (light, whatever the host machine uses) and the image is labelled
-     `app-default`, because the app's own setting decides what it shows.
+     its own theme setting instead, a forced theme will not show; note it rather than changing the
+     setting. Without `"theme"` the browser reports its fixed default preference (light, whatever the
+     host machine uses) and the image is labelled `app-default`.
    - **`screenify-out/config.json`:** `"baseUrl"` (for example `http://localhost:3000`), `"start"` (the
-     command that boots the app with seed data, so refresh can start it), `"readyUrl"` and
-     `"readyTimeout"` (seconds to keep probing) when the app is ready later than its port opens,
-     `"platforms"` as the user chose them (`"web-desktop"`, `"web-mobile"`), `"hide"` with the CSS
-     selectors of dev-only overlays that would cover screenshots (for Next.js, `"nextjs-portal"`; find
-     the app's own by reading its dev tooling; `doctor` warns about selectors that do not parse), and
-     `"versionUrl"` if the app exposes the commit it serves, so captures from an out-of-date server
-     are flagged. The endpoint must answer JSON with a `"commit"` or `"sha"` field, or a plain-text
-     body that is only the hash; anything else records no served commit.
+     command that boots the app, so refresh can start it), `"readyUrl"` and `"readyTimeout"`
+     (seconds to keep probing) when the app is ready later than its port opens, `"platforms"` as the
+     user chose them (`"web-desktop"`, `"web-mobile"`), `"hide"` (below), and `"versionUrl"` if the
+     app exposes the commit it serves, so captures from an out-of-date server are flagged. The
+     endpoint must answer JSON with a `"commit"` or `"sha"` field, or a plain-text body that is only
+     the hash; anything else records no served commit.
    - Check with `npx screenify doctor`.
-   **Environment blockers stop you once.** If the app will not start, an account or credential is
-   missing, sign-in fails, or a gate in `requires` cannot be switched, stop and report that blocker
-   with what you tried. Do not spend repair attempts on recipes that cannot pass until the
-   environment changes.
+   **Blockers stop you once.** If the app will not start, sign-in fails, or there is no account you
+   can use, stop and report that with what you tried. Do not spend repair attempts on recipes that
+   cannot pass until the environment changes.
 2. **Sign in once, if needed.** Write an auth recipe (`"kind": "auth"`) at
    `screenify-out/recipes/web/auth/login.json`; other recipes reference it with `"auth": "login"`.
    Its last step is a `waitFor` on an element only a signed-in user sees (the account menu, the
@@ -75,30 +82,47 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
    session. One-time sign-in links and tokens go through a `${VAR}` `goto`, never into the file;
    every value read from the environment is scrubbed from all output, sidecars and failure files.
    Each `run` signs in once afresh (a session saved by an earlier run is never reused, since it may
-   have expired). A failed sign-in, or an auth recipe that is missing or fails to load, stops the
-   whole `run` once with the reason, the final URL and the page's error text: that is an
-   environment problem; report it.
-3. **Screens first.** For each pending screen item, write
-   `screenify-out/recipes/<platform>/<feature>/<name>.json` with one `shot` per state, reaching each
-   state the way its `how` line says, with a `waitFor` on something that state shows right before
-   each shot. Open the item's `example` path. Then `npx screenify run <recipe>…` (several at once is
-   fine).
+   have expired), and the saved session is readable by the owner only. A failed sign-in, or an auth
+   recipe that is missing or fails to load, stops the whole `run` once with the reason, the final
+   URL and the page's error text: that is a blocker; report it.
+3. **Screens first.** For each pending screen item, write its recipe with one `shot` per state,
+   reaching each state the way its `how` line says. Before each shot, `waitFor` something that only
+   that state shows. For a state with data ("filled", a detail page), wait for an actual data row or
+   item, never the page heading or chrome, and add an `expect` with that row's text, so a shot of
+   loading skeletons fails instead of being filed. Prefer exact names in locators
+   (`{"role": "button", "name": "Filters", "exact": true}`): without `exact`, "Filters" also matches
+   "Open filters". Open the item's `example` path. Then `npx screenify run <recipe>…`.
 4. **Then flows.** For each pending flow item, write a flow recipe following its `steps` outline
    with 4 to 6 shots: the starting screen, each meaningful step, and the result. Every flow shot
    has a `caption` naming the step just taken.
 5. **Review every new image (required).** For each capture `run` filed, open the image and its `.md`
    sidecar and answer:
-   - Does it show the plan item and the state it is named for, and what its `shows` line claims?
-   - Is it the empty state when "filled" was claimed, or a different screen after a redirect?
-   - Is a toast, error, spinner, skeleton, dev badge, cookie banner or modal covering what matters?
+   - Does it show the plan item and the state it is named for?
+   - Is it loading: skeletons, spinners, placeholder blocks where data should be?
+   - Is it the empty state when "filled" was claimed, a different screen after a redirect, or a
+     "not available" message?
+   - Is it the right context: the workspace, tenant, project or account the plan item expects? If the
+     app opened a different one, note it as an environment gap (the recipe can navigate to the right
+     one once the user says which).
+   - Is anything covering what matters: a toast, an error, a dev badge, a cookie banner, a chat or
+     assistant bubble, a floating bar? Add it to `hide` (below).
    - Is a long screen cut off because the page scrolls an inner panel? Then add `scrollContainer`.
-   If it is wrong, repair the recipe (a better `waitFor`, an `expect`, `scrollContainer`, a `hide`
-   selector, data in the environment) and run it again, or skip that state with the reason. Add an
-   `expect` for what you checked by eye so the next refresh catches the same mistake without you.
+   Then rewrite the shot's `shows` to say what the image actually shows ("Goals list with three goals,
+   one at risk"); never a placeholder such as the screen and state names, which the CLI rejects.
+   If the image is wrong, take it out (`npx screenify remove <capture id> --note "loading
+   skeletons, not data"`; its state shows as pending again), repair the recipe (a better `waitFor`,
+   an `expect`, `exact`, `scrollContainer`, a `hide` selector) and run it again. If it is wrong
+   because of the environment (no data, a feature not available, the wrong workspace), skip the
+   state with the reason and add the gap to your suggestions. Add an `expect` for what you checked
+   by eye so the next refresh catches the same mistake without you.
 6. **Repair failures.** A failed run prints the step that failed and a page-at-failure image under
-   `screenify-out/.failures/` with a `.md` beside it (error, final URL, alert text). Open both, fix
-   the locator, wait or environment, and run again. Two tries per recipe; then skip with a note
-   saying what blocked it. A failed recipe files nothing, at any viewport.
+   `screenify-out/.failures/` with a `.md` beside it: the error, the final URL ("page is on /x
+   (expected /y)" when a redirect moved it), alert text, and the page's accessibility outline, where
+   you find the names to put in working locators. Open both, fix the locator or wait, and run again.
+   While repairing one state of many, `npx screenify run <recipe> --keep-passing` files the shots
+   that passed every check (it still reports the failure); review those images like any other. Two
+   tries per recipe; then skip with a note saying what blocked it. Without `--keep-passing` a failed
+   recipe files nothing, at any viewport.
    **Recipes written before `shows`, flow `caption` and viewports were required** fail to load with
    the list of what is missing (for example `step 3: "shows" must say in one line what the image
    shows`). Repair each: add `"shows"` to every `shot`, a `"caption"` to every flow shot, a `waitFor`
@@ -107,10 +131,21 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
    the first successful run removes the old `--light` images that recipe filed.
 7. **Close the items.** `npx screenify status` shows captured/total states per item. A screen item is
    captured once every state has an image; for a state that cannot be captured, say why:
-   `npx screenify plan done <id> --skip-state <state> --note "needs a paid account"`. Skip a whole
-   item with `--skip --note "…"`. `plan done <id>` refuses while a state has neither.
-8. **Report** briefly: what was captured, what was skipped and why, what failed, and any environment
-   blocker the user must fix.
+   `npx screenify plan done <id> --skip-state <state> --note "no sample data in this environment"`.
+   Skip a whole item with `--skip --note "…"`. `plan done <id>` refuses while a state has neither.
+   Your notes are kept as the item's capture note, apart from discovery's note.
+8. **Report** briefly: what was captured, what was skipped and why, what failed, any blocker, and a
+   list of **environment suggestions** for the user, each naming the states it would unlock and how
+   (the repo's seed script, an account with a given role, a feature to turn on, a workspace to open).
+   When the skill hands you a suggestion the user agreed to, carry out exactly that and capture the
+   skipped states again.
+
+**Overlays the app draws** (a dev badge, a toast, an assistant or chat bubble, a cookie banner, a
+floating navigation bar) cover content in many images. After the first review, hide them for every
+shot: find the element in a sidecar's accessibility outline (or the failure sidecar's), read the
+app's code for its element, class or `data-` attribute, and add a CSS selector for it to `"hide"` in
+`config.json`, for example `".toast"`, `"[data-chat-launcher]"` or, for a Next.js dev build,
+`"nextjs-portal"`. `doctor` and `run` warn about a selector that does not parse.
 
 Other platforms (Flutter, iOS, Android, desktop apps): capture with the platform's own headless
 tools (simulator screenshot, `flutter screenshot`, `adb exec-out screencap -p`), review the image as
@@ -155,7 +190,10 @@ when you do not know which theme the image shows; it is then filed as `app-defau
   `"screen"` to name another screen), `flow` (each `shot` is a numbered frame and needs a `caption`),
   or `auth` (signs in and saves the session; no shots needed).
 - Every `shot` needs `shows`: one line saying what the image shows ("Goals list with three goals, one
-  at risk"). It goes into the sidecar and INDEX.md, and it is what you check in step 5.
+  at risk"), corrected after you look at the image. It goes into the sidecar and INDEX.md. A `shows`
+  that only repeats the screen and state names, or starts with "discovery:", is rejected.
+- A shot of a state the plan marks `writes` (reaching it changes data or settings) needs
+  `"writes": true` on the recipe.
 - Shot checks (a failing check fails the recipe and nothing is filed):
   - `expectUrl`: the route pattern the page must be on (`/goals`, `/tasks/:id`, `/docs/*rest`). A
     screen recipe's shots of its own screen default to the plan item's `route`, so a redirect to
@@ -176,7 +214,9 @@ when you do not know which theme the image shows; it is then filed as `app-defau
   `waitFor` (a locator, `{"url": "/path"}` or `{"text": "…"}`), `wait` (milliseconds; avoid),
   `shot`.
 - Locators, in order of preference: `{"role": "button", "name": "Save"}`, `{"text": "…"}`,
-  `{"label": "Email"}`, `{"testId": "…"}`, `{"css": "…"}`. Add `"nth": 0` when several match.
+  `{"label": "Email"}`, `{"testId": "…"}`, `{"css": "…"}`. Names and text match as substrings unless
+  `"exact": true` (role, text and label locators); prefer exact names. Add `"nth": 0` when several
+  match.
 - `viewports`: `desktop` (1440x900), `laptop` (1280x800), `tablet` (820x1180), `mobile` (390x844),
   all at device scale 1, or `{"name": "…", "width": …, "height": …, "deviceScaleFactor": 2}` (a scale
   other than 1 is added to the label, `mobile-390x844-2x`). Without `viewports`, the recipe uses the

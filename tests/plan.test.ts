@@ -95,10 +95,10 @@ describe('plan item fields and per-state coverage', () => {
   const twoStates = { ...list, states: [{ name: 'filled', how: 'Seed three tasks' }, { name: 'empty', how: 'No tasks' }] };
 
   it('parses auth and requires, and rejects a bad requires', () => {
-    const [item] = parsePlanImport([{ ...list, auth: 'member', requires: ['alpha build channel'] }]);
-    expect(item).toMatchObject({ auth: 'member', requires: ['alpha build channel'], skippedStates: {} });
+    const [item] = parsePlanImport([{ ...list, auth: 'member', requires: ['sample records in the list'] }]);
+    expect(item).toMatchObject({ auth: 'member', requires: ['sample records in the list'], skippedStates: {} });
     expect(parsePlanImport([list])[0].requires).toEqual([]);
-    expect(() => parsePlanImport([{ ...list, requires: 'alpha' }])).toThrow(/"requires" must list what capture needs first/);
+    expect(() => parsePlanImport([{ ...list, requires: 'sample records' }])).toThrow(/"requires" must list in words what the environment must provide/);
     expect(() => parsePlanImport([{ ...list, auth: 3 }])).toThrow(/"auth" must be a string/);
   });
 
@@ -163,5 +163,28 @@ describe('coverage follows the item\'s own screen and its current states', () =>
     const { item } = parsePlanItem({ ...list, states: [{ name: 'filled', how: 'Seed' }] }, 'plan add');
     upsertPlanItem(plan, item!, manifest);
     expect(plan.items[0].status).toBe('captured');
+  });
+});
+
+describe('capture-side fields and writing states', () => {
+  it('never takes status, captures, skips or capture notes from an imported file', () => {
+    const plan = emptyPlan();
+    importPlan(plan, parsePlanImport([{ ...list, status: 'captured', captures: ['x'], skippedStates: { empty: 'no' }, captureNote: 'old run' }]), null);
+    expect(plan.items[0]).toMatchObject({ status: 'pending', captures: [], skippedStates: {} });
+    expect(plan.items[0].captureNote).toBeUndefined();
+  });
+  it('keeps a skip reason apart from the discovery note, across re-imports', () => {
+    const plan = emptyPlan();
+    importPlan(plan, parsePlanImport([{ ...list, note: 'Open it from the sidebar' }]), null);
+    const manifest: Manifest = { version: 1, captures: {} };
+    markDone(plan, manifest, 'screen:web:tasks:task-list', { skip: true, note: 'needs sample records' });
+    expect(plan.items[0]).toMatchObject({ note: 'Open it from the sidebar', captureNote: 'needs sample records', status: 'skipped' });
+    importPlan(plan, parsePlanImport([{ ...list, note: 'Open it from the sidebar' }]), null);
+    expect(plan.items[0]).toMatchObject({ note: 'Open it from the sidebar', captureNote: 'needs sample records' });
+  });
+  it('parses states that write and rejects a bad writes value', () => {
+    const [item] = parsePlanImport([{ ...list, states: [{ name: 'default', how: 'Open' }, { name: 'dark-mode', how: 'Switch the theme in settings', writes: true }] }]);
+    expect(item.states).toEqual([{ name: 'default', how: 'Open' }, { name: 'dark-mode', how: 'Switch the theme in settings', writes: true }]);
+    expect(() => parsePlanImport([{ ...list, states: [{ name: 'x', how: 'y', writes: 'yes' }] }])).toThrow(/states\[0\] "writes" must be true or false/);
   });
 });

@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync, existsSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /** Reads and parses a JSON file, returning `fallback` when the file does not exist. */
@@ -12,11 +12,15 @@ export function readJson<T>(path: string, fallback: T): T {
   }
 }
 
-/** Writes a file atomically (temp file then rename), creating parent folders. */
-export function writeFileAtomic(path: string, data: string | Buffer): void {
+/**
+ * Writes a file atomically (temp file then rename), creating parent folders. `mode` sets the new
+ * file's permissions from its creation, so a private file is never briefly readable by others.
+ */
+export function writeFileAtomic(path: string, data: string | Buffer, mode?: number): void {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, data);
+  writeFileSync(tmp, data, mode === undefined ? undefined : { mode });
+  if (mode !== undefined) chmodSync(tmp, mode);
   renameSync(tmp, path);
 }
 

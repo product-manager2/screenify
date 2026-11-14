@@ -96,7 +96,7 @@ export function renderIndex(store: Store, manifest: Manifest, plan: Plan, status
   const skippedStates = plan.items.flatMap((i) => Object.entries(i.skippedStates).map(([state, why]) => `- \`${i.id}\` state ${state}: ${why}`));
   if (status.skipped.length || skippedStates.length) {
     out.push('## Skipped', '');
-    for (const i of status.skipped) out.push(`- \`${i.id}\`${i.note ? `: ${i.note}` : ''}`);
+    for (const i of status.skipped) out.push(`- \`${i.id}\`${i.captureNote ? `: ${i.captureNote}` : ''}`);
     out.push(...skippedStates, '');
   }
   if (plan.items.length) {
