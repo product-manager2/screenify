@@ -1,0 +1,101 @@
+{
+ "code-only-1": {
+  "cost_usd_list_price": 0.74,
+  "model_calls": 16,
+  "input": 32,
+  "output": 7844,
+  "cache_read": 1712419,
+  "cache_write_5m": 128824,
+  "cache_write_1h": 0,
+  "tool_calls": 15,
+  "screenshot_images_opened": 0
+ },
+ "code-only-2": {
+  "cost_usd_list_price": 0.67,
+  "model_calls": 15,
+  "input": 30,
+  "output": 7336,
+  "cache_read": 1736444,
+  "cache_write_5m": 99133,
+  "cache_write_1h": 0,
+  "tool_calls": 16,
+  "screenshot_images_opened": 0
+ },
+ "code-only-3": {
+  "cost_usd_list_price": 0.65,
+  "model_calls": 15,
+  "input": 30,
+  "output": 7345,
+  "cache_read": 1702868,
+  "cache_write_5m": 95831,
+  "cache_write_1h": 0,
+  "tool_calls": 15,
+  "screenshot_images_opened": 0
+ },
+ "with-screenify-1": {
+  "cost_usd_list_price": 0.5,
+  "model_calls": 11,
+  "input": 22,
+  "output": 5978,
+  "cache_read": 1134188,
+  "cache_write_5m": 86304,
+  "cache_write_1h": 0,
+  "tool_calls": 10,
+  "screenshot_images_opened": 0
+ },
+ "with-screenify-2": {
+  "cost_usd_list_price": 0.74,
+  "model_calls": 18,
+  "input": 36,
+  "output": 7461,
+  "cache_read": 2098341,
+  "cache_write_5m": 96756,
+  "cache_write_1h": 0,
+  "tool_calls": 18,
+  "screenshot_images_opened": 0
+ },
+ "with-screenify-3": {
+  "cost_usd_list_price": 0.8,
+  "model_calls": 17,
+  "input": 34,
+  "output": 10403,
+  "cache_read": 2072085,
+  "cache_write_5m": 111370,
+  "cache_write_1h": 0,
+  "tool_calls": 18,
+  "screenshot_images_opened": 0
+ },
+ "browse-it-yourself-1": {
+  "cost_usd_list_price": 1.76,
+  "model_calls": 40,
+  "input": 80,
+  "output": 23421,
+  "cache_read": 5777176,
+  "cache_write_5m": 148765,
+  "cache_write_1h": 0,
+  "tool_calls": 41,
+  "screenshot_images_opened": 0
+ },
+ "browse-it-yourself-2": {
+  "cost_usd_list_price": 1.87,
+  "model_calls": 43,
+  "input": 86,
+  "output": 25585,
+  "cache_read": 6238336,
+  "cache_write_5m": 145911,
+  "cache_write_1h": 0,
+  "tool_calls": 45,
+  "screenshot_images_opened": 2
+ },
+ "browse-it-yourself-3": {
+  "cost_usd_list_price": 1.46,
+  "model_calls": 33,
+  "input": 66,
+  "output": 16805,
+  "cache_read": 4691294,
+  "cache_write_5m": 140749,
+  "cache_write_1h": 0,
+  "tool_calls": 35,
+  "screenshot_images_opened": 2
+ }
+}

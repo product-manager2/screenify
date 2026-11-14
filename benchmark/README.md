@@ -1,6 +1,6 @@
 # Benchmark: what does the app look like, with and without Screenify
 
-Two small tests on one open-source app, run on 2026-11-14 with Claude Sonnet 5.5. Everything
+Three small tests on one open-source app, run on 2026-11-14 with Claude Sonnet 5.5. Everything
 needed to check or repeat them is in this folder, including the runs that went badly.
 
 **These scenarios were chosen where Screenify should help most**: questions about what is on
@@ -96,6 +96,63 @@ Side-by-side images use, per arm and screen, the run with the median score
 ([`redraw/side-by-side/`](redraw/side-by-side/)); all eighteen renders and their HTML are in
 [`redraw/renders/`](redraw/renders/) and [`redraw/pages/`](redraw/pages/).
 
+## Test 3: build on it
+
+Each run implements three feature requests in a Memos checkout, as a contributor would
+([`build-on-it/task.md`](build-on-it/task.md)). Each request has a trap that seeing the app should
+help with:
+
+1. **Copy a memo's text.** This already exists, under ⋮ > Copy > Copy content. The trap is a duplicate.
+2. **Add Duplicate to the ⋮ menu.** The trap is consistency with the menu's other items.
+3. **Show an "edited" label.** The app already shows "Last updated at" in one display mode. The traps are small states and doubling up.
+
+The same three arms, three runs each, ran on Claude Sonnet 5.5. Every run's code was built and
+started, a script posted two memos, edited one and opened its ⋮ menu, and the built app was
+screenshotted ([`build-on-it/screens/`](build-on-it/screens/)). A separate model graded each run
+under a shuffled name, using its diff, its final reply and those screenshots. It scored against a
+17-item pass/fail checklist written from the source before any run
+([`build-on-it/checklist.md`](build-on-it/checklist.md); its "Total: 16" line is a miscount, since
+item 3f was added before the runs).
+
+| | Code only | Code + Screenify | Browse it yourself |
+| --- | --- | --- | --- |
+| Checklist items passed (3 runs × 17) | **51 / 51** | 48 / 51 | **51 / 51** |
+| Per run | 17, 17, 17 | 15, 17, 16 | 17, 17, 17 |
+| Cost per run, list price | $0.69 | $0.68 | $1.70 |
+| Tool calls per run | 15 | 15 | 40 |
+| Screenshot images opened | — | **0 in every run** | 0, 2, 2 |
+
+**The library did not help here, because it was not used.** None of the three library runs opened
+a single image. The library's only pointer is one line at the end of `AGENTS.md`: one run read just
+the first 80 lines of that file, and the other two read only the top of the library's `INDEX.md`
+and went back to the code. These runs are effectively code-only runs, and their lost points look
+like ordinary run-to-run variation, not harm from the library:
+
+- **with-screenify-1** used a translation key that does not exist, so the built menu shows the raw text
+  `common.duplicate`. It also made the "edited" label smaller than the time beside it.
+- **with-screenify-3** hid Duplicate on memos with attachments, unlike Edit.
+
+![The ⋮ menu in unchanged Memos and in three of the built runs](build-on-it/side-by-side/menu.png)
+
+Every run in every arm noticed that copying a memo's text already exists, and hid "edited" where
+"Last updated at" already shows. One browse run also added a one-click copy button that reuses the
+existing copy action through a shared hook. Two of the browse runs added their new text to all 46
+locale files, as a Memos locale test requires; the other seven added English only and would fail
+that test, which the checklist does not score. The browse runs cost about 2.5 times as much and
+used their running app little.
+
+What this says for Screenify: a library an agent does not open cannot help it. The pointer moves to
+the top of `AGENTS.md`, and `INDEX.md` opens with when to look ("before changing a screen, open its
+image"). Whether that changes this result needs a rerun.
+
+**Disclosed.** A few more screens were captured into the library for this test. The checklist was
+edited (item 3f added) after its fingerprint was taken but before any run. Two sentences in two
+browse runs' replies that named their running app were blanked for grading; the files here are
+unedited. Diffs shown to the grader collapsed non-English locale edits into a one-line note.
+Grades: [`build-on-it/grades.json`](build-on-it/grades.json); costs and tool calls:
+[`build-on-it/usage.json`](build-on-it/usage.json); diffs and replies in
+[`build-on-it/`](build-on-it/).
+
 ## Method
 
 - **App.** Memos v26.11.0 (MIT), started with
@@ -119,8 +176,8 @@ Side-by-side images use, per arm and screen, the run with the median score
 - **Only screens that were captured, and only still images.** Screenify files states a recipe can
   stop on (a page, an open menu, a dialog); it does not show animations or transitions. For a
   screen that is not in the library the agent is back to reading code.
-- **Factual questions and look-alike redraws only.** Whether designs or feature suggestions come
-  out better needs a different, human-judged test.
+- **Factual questions, look-alike redraws and one small feature task only.** Whether designs or
+  feature suggestions come out better needs a different, human-judged test.
 - **The machine was busy** during the runs, so absolute times are slow for every arm.
 
 ## Repeating it
