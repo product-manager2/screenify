@@ -1,0 +1,518 @@
+{
+ "code-only-1": {
+  "blind_id": "set-3",
+  "total": 19,
+  "questions": {
+   "1": {
+    "score": 1,
+    "why": ""
+   },
+   "2": {
+    "score": 1,
+    "why": ""
+   },
+   "3": {
+    "score": 1,
+    "why": ""
+   },
+   "4": {
+    "score": 1,
+    "why": ""
+   },
+   "5": {
+    "score": 1,
+    "why": ""
+   },
+   "6": {
+    "score": 1,
+    "why": ""
+   },
+   "7": {
+    "score": 1,
+    "why": ""
+   },
+   "8": {
+    "score": 1,
+    "why": ""
+   },
+   "9": {
+    "score": 1,
+    "why": ""
+   },
+   "10": {
+    "score": 1,
+    "why": ""
+   },
+   "11": {
+    "score": 1,
+    "why": ""
+   },
+   "12": {
+    "score": 1,
+    "why": ""
+   },
+   "13": {
+    "score": 1,
+    "why": ""
+   },
+   "14": {
+    "score": 1,
+    "why": ""
+   },
+   "15": {
+    "score": 1,
+    "why": ""
+   },
+   "16": {
+    "score": 1,
+    "why": ""
+   },
+   "17": {
+    "score": 0,
+    "why": "Omits the required Usage limits block."
+   },
+   "18": {
+    "score": 1,
+    "why": ""
+   },
+   "19": {
+    "score": 1,
+    "why": ""
+   },
+   "20": {
+    "score": 1,
+    "why": ""
+   }
+  }
+ },
+ "code-only-2": {
+  "blind_id": "set-6",
+  "total": 18,
+  "questions": {
+   "1": {
+    "score": 1,
+    "why": ""
+   },
+   "2": {
+    "score": 0,
+    "why": "Theme selector stated as showing \"Sync with system\"; key says it shows \"System\"."
+   },
+   "3": {
+    "score": 1,
+    "why": ""
+   },
+   "4": {
+    "score": 1,
+    "why": ""
+   },
+   "5": {
+    "score": 1,
+    "why": ""
+   },
+   "6": {
+    "score": 1,
+    "why": ""
+   },
+   "7": {
+    "score": 1,
+    "why": ""
+   },
+   "8": {
+    "score": 1,
+    "why": ""
+   },
+   "9": {
+    "score": 1,
+    "why": ""
+   },
+   "10": {
+    "score": 1,
+    "why": ""
+   },
+   "11": {
+    "score": 1,
+    "why": ""
+   },
+   "12": {
+    "score": 1,
+    "why": ""
+   },
+   "13": {
+    "score": 1,
+    "why": ""
+   },
+   "14": {
+    "score": 0,
+    "why": "Says the list is empty but omits the required \"No data found.\" text."
+   },
+   "15": {
+    "score": 1,
+    "why": ""
+   },
+   "16": {
+    "score": 1,
+    "why": ""
+   },
+   "17": {
+    "score": 1,
+    "why": ""
+   },
+   "18": {
+    "score": 1,
+    "why": ""
+   },
+   "19": {
+    "score": 1,
+    "why": ""
+   },
+   "20": {
+    "score": 1,
+    "why": ""
+   }
+  }
+ },
+ "code-only-3": {
+  "blind_id": "set-2",
+  "total": 18,
+  "questions": {
+   "1": {
+    "score": 1,
+    "why": ""
+   },
+   "2": {
+    "score": 0,
+    "why": "Theme selector stated as showing \"Sync with system\"; key says it shows \"System\"."
+   },
+   "3": {
+    "score": 1,
+    "why": ""
+   },
+   "4": {
+    "score": 1,
+    "why": ""
+   },
+   "5": {
+    "score": 1,
+    "why": ""
+   },
+   "6": {
+    "score": 1,
+    "why": ""
+   },
+   "7": {
+    "score": 1,
+    "why": ""
+   },
+   "8": {
+    "score": 1,
+    "why": ""
+   },
+   "9": {
+    "score": 1,
+    "why": ""
+   },
+   "10": {
+    "score": 1,
+    "why": ""
+   },
+   "11": {
+    "score": 1,
+    "why": ""
+   },
+   "12": {
+    "score": 1,
+    "why": ""
+   },
+   "13": {
+    "score": 1,
+    "why": ""
+   },
+   "14": {
+    "score": 1,
+    "why": ""
+   },
+   "15": {
+    "score": 1,
+    "why": ""
+   },
+   "16": {
+    "score": 1,
+    "why": ""
+   },
+   "17": {
+    "score": 1,
+    "why": ""
+   },
+   "18": {
+    "score": 0,
+    "why": "Adds a reaction picker at top-right as always present; key shows only the three-dot menu."
+   },
+   "19": {
+    "score": 1,
+    "why": ""
+   },
+   "20": {
+    "score": 1,
+    "why": ""
+   }
+  }
+ },
+ "with-screenify-1": {
+  "blind_id": "set-5",
+  "total": 20,
+  "questions": {
+   "1": {
+    "score": 1,
+    "why": ""
+   },
+   "2": {
+    "score": 1,
+    "why": ""
+   },
+   "3": {
+    "score": 1,
+    "why": ""
+   },
+   "4": {
+    "score": 1,
+    "why": ""
+   },
+   "5": {
+    "score": 1,
+    "why": ""
+   },
+   "6": {
+    "score": 1,
+    "why": ""
+   },
+   "7": {
+    "score": 1,
+    "why": ""
+   },
+   "8": {
+    "score": 1,
+    "why": ""
+   },
+   "9": {
+    "score": 1,
+    "why": ""
+   },
+   "10": {
+    "score": 1,
+    "why": ""
+   },
+   "11": {
+    "score": 1,
+    "why": ""
+   },
+   "12": {
+    "score": 1,
+    "why": ""
+   },
+   "13": {
+    "score": 1,
+    "why": ""
+   },
+   "14": {
+    "score": 1,
+    "why": ""
+   },
+   "15": {
+    "score": 1,
+    "why": ""
+   },
+   "16": {
+    "score": 1,
+    "why": ""
+   },
+   "17": {
+    "score": 1,
+    "why": ""
+   },
+   "18": {
+    "score": 1,
+    "why": ""
+   },
+   "19": {
+    "score": 1,
+    "why": ""
+   },
+   "20": {
+    "score": 1,
+    "why": ""
+   }
+  }
+ },
+ "with-screenify-2": {
+  "blind_id": "set-1",
+  "total": 20,
+  "questions": {
+   "1": {
+    "score": 1,
+    "why": ""
+   },
+   "2": {
+    "score": 1,
+    "why": ""
+   },
+   "3": {
+    "score": 1,
+    "why": ""
+   },
+   "4": {
+    "score": 1,
+    "why": ""
+   },
+   "5": {
+    "score": 1,
+    "why": ""
+   },
+   "6": {
+    "score": 1,
+    "why": ""
+   },
+   "7": {
+    "score": 1,
+    "why": ""
+   },
+   "8": {
+    "score": 1,
+    "why": ""
+   },
+   "9": {
+    "score": 1,
+    "why": ""
+   },
+   "10": {
+    "score": 1,
+    "why": ""
+   },
+   "11": {
+    "score": 1,
+    "why": ""
+   },
+   "12": {
+    "score": 1,
+    "why": ""
+   },
+   "13": {
+    "score": 1,
+    "why": ""
+   },
+   "14": {
+    "score": 1,
+    "why": ""
+   },
+   "15": {
+    "score": 1,
+    "why": ""
+   },
+   "16": {
+    "score": 1,
+    "why": ""
+   },
+   "17": {
+    "score": 1,
+    "why": ""
+   },
+   "18": {
+    "score": 1,
+    "why": ""
+   },
+   "19": {
+    "score": 1,
+    "why": ""
+   },
+   "20": {
+    "score": 1,
+    "why": ""
+   }
+  }
+ },
+ "with-screenify-3": {
+  "blind_id": "set-4",
+  "total": 20,
+  "questions": {
+   "1": {
+    "score": 1,
+    "why": ""
+   },
+   "2": {
+    "score": 1,
+    "why": ""
+   },
+   "3": {
+    "score": 1,
+    "why": ""
+   },
+   "4": {
+    "score": 1,
+    "why": ""
+   },
+   "5": {
+    "score": 1,
+    "why": ""
+   },
+   "6": {
+    "score": 1,
+    "why": ""
+   },
+   "7": {
+    "score": 1,
+    "why": ""
+   },
+   "8": {
+    "score": 1,
+    "why": ""
+   },
+   "9": {
+    "score": 1,
+    "why": ""
+   },
+   "10": {
+    "score": 1,
+    "why": ""
+   },
+   "11": {
+    "score": 1,
+    "why": ""
+   },
+   "12": {
+    "score": 1,
+    "why": ""
+   },
+   "13": {
+    "score": 1,
+    "why": ""
+   },
+   "14": {
+    "score": 1,
+    "why": ""
+   },
+   "15": {
+    "score": 1,
+    "why": ""
+   },
+   "16": {
+    "score": 1,
+    "why": ""
+   },
+   "17": {
+    "score": 1,
+    "why": ""
+   },
+   "18": {
+    "score": 1,
+    "why": ""
+   },
+   "19": {
+    "score": 1,
+    "why": ""
+   },
+   "20": {
+    "score": 1,
+    "why": ""
+   }
+  }
+ }
+}

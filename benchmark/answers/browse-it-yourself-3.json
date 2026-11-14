@@ -1,0 +1,22 @@
+{
+"1":"Welcome back.",
+"2":"A language selector (shows English, with a globe icon) and a theme selector (shows System, with a monitor icon), side by side below the card.",
+"3":"\"Don't have an account yet?\" followed by a blue \"Sign up\" link.",
+"4":"Group heading BASIC; links: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import.",
+"5":"Appearance, Memo defaults, Uploads & privacy, This device.",
+"6":"Save media metadata: off. Link preview: on. Double-click to edit: off.",
+"7":"Theme shows \"Sync with system\"; Default memo visibility shows \"Private\" (with a lock icon).",
+"8":"Any thoughts...",
+"9":"A \"+\" (add) button, a \"Private\" visibility dropdown with lock icon, and on the far right a (disabled/greyed) Save button.",
+"10":"Top: user name (bench) header with a compose/new-memo icon; then nav row (Timeline dropdown, calendar, map, attachments, search icons); then a month calendar (November 2026) with prev/next arrows; then VIEWS section with 'Create view'; a tags list below only if the user has tags (none for a new account).",
+"11":"Only Timeline shows a text label (with a dropdown chevron); Calendar, Map, Attachments and Search are icon-only.",
+"12":"\"Memos demo — Feel free to explore! This demo is reset periodically.\" with a \"Deploy your own Memos\" link; a bar across the top of the page above the content.",
+"13":"Sidebar under INBOX: All, Unread, Archived. With no notifications the page shows the title Inbox and \"No data found.\"",
+"14":"Title \"Archived\" and \"No data found.\"",
+"15":"\"404\" and \"The page you are looking for can't be found.\"",
+"16":"Official Website, Documents, API Docs, GitHub Repo, Web Clipper, Sponsor Memos.",
+"17":"Account Information (@bench, Edit, Change password); Statistics (attachment storage, usage limits: Memos, Storage, Memo content, Largest file); SSO Accounts (No SSO found.); Danger area (Delete account).",
+"18":"Top-left: the timestamp/date (e.g. 'Today, 10:42'). Top-right: a visibility (lock) icon and a three-dot more-options menu.",
+"19":"As a rounded pill/chip with a border and tinted blue background, text like #books.",
+"20":"A hash icon, the tag name, and the memo count at the right (hierarchical tags nest with expand chevron). No tags exist for a new account (unsure on visual of count from live app)."
+}

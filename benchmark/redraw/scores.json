@@ -1,0 +1,254 @@
+{
+ "preferences": {
+  "code-only-3": {
+   "layout": 9,
+   "text": 10,
+   "order": 10,
+   "missing": 10,
+   "invented": 10,
+   "overall": 9,
+   "differences": [
+    "Calendar, map and attachment icons next to Timeline sit about 6px further left than in the real screen",
+    "Spaces icon is drawn slightly differently"
+   ],
+   "blind_id": "A"
+  },
+  "code-only-2": {
+   "layout": 9,
+   "text": 10,
+   "order": 10,
+   "missing": 10,
+   "invented": 10,
+   "overall": 9,
+   "differences": [
+    "Calendar, map and attachment icons next to Timeline sit about 6px further left than in the real screen",
+    "Spaces icon is a thinner sparkle shape",
+    "Dropdown chevrons drawn slightly differently"
+   ],
+   "blind_id": "B"
+  },
+  "with-screenify-3": {
+   "layout": 8,
+   "text": 10,
+   "order": 10,
+   "missing": 9,
+   "invented": 7,
+   "overall": 7,
+   "differences": [
+    "Toolbar and sidebar icons are different glyphs (grid, list, x-circle and pin instead of calendar, map, paperclip and search; grey dot for My Account)",
+    "Language and visibility selects use emoji globe and lock",
+    "Content sits about 6px lower and rows are slightly taller"
+   ],
+   "blind_id": "C"
+  },
+  "code-only-1": {
+   "layout": 10,
+   "text": 10,
+   "order": 10,
+   "missing": 10,
+   "invented": 10,
+   "overall": 9,
+   "differences": [
+    "Globe icon and dropdown chevrons are drawn bolder and darker than in the real screen",
+    "Spaces icon slightly different"
+   ],
+   "blind_id": "D"
+  },
+  "with-screenify-2": {
+   "layout": 8,
+   "text": 10,
+   "order": 10,
+   "missing": 9,
+   "invented": 6,
+   "overall": 7,
+   "differences": [
+    "Colour emoji icons (calendar, map, paperclip, magnifier, key, tag, lock) instead of thin line icons",
+    "Logo is a different emoji-like bird and Timeline uses a hamburger glyph",
+    "Select boxes are positioned and sized slightly differently"
+   ],
+   "blind_id": "E"
+  },
+  "with-screenify-1": {
+   "layout": 7,
+   "text": 9,
+   "order": 10,
+   "missing": 8,
+   "invented": 10,
+   "overall": 8,
+   "differences": [
+    "The whole settings column starts about 24px lower than in the real screen",
+    "As a result the Double-click to edit row is pushed off the bottom and not visible"
+   ],
+   "blind_id": "F"
+  }
+ },
+ "about": {
+  "code-only-2": {
+   "layout": 9,
+   "text": 10,
+   "order": 10,
+   "missing": 10,
+   "invented": 10,
+   "overall": 9,
+   "differences": [
+    "Calendar, map and attachment icons next to Timeline sit about 6px further left",
+    "Large logo bird is drawn slightly differently",
+    "Heart and book icons differ by a hair"
+   ],
+   "blind_id": "A"
+  },
+  "with-screenify-2": {
+   "layout": 7,
+   "text": 10,
+   "order": 10,
+   "missing": 8,
+   "invented": 6,
+   "overall": 6,
+   "differences": [
+    "Headline wraps onto four lines (thoughts. on its own line) and the description below it is pushed down",
+    "Emoji and block-glyph icons (bird emoji logo, striped document, fork, scissors) and plain arrows instead of the line icons and external-link icons",
+    "Version and Demo badges sit higher, tight under the title"
+   ],
+   "blind_id": "B"
+  },
+  "with-screenify-1": {
+   "layout": 9,
+   "text": 10,
+   "order": 10,
+   "missing": 10,
+   "invented": 10,
+   "overall": 9,
+   "differences": [
+    "Large logo bird is drawn slightly differently",
+    "Book and heart icons differ by a hair"
+   ],
+   "blind_id": "C"
+  },
+  "code-only-3": {
+   "layout": 8,
+   "text": 10,
+   "order": 10,
+   "missing": 10,
+   "invented": 10,
+   "overall": 8,
+   "differences": [
+    "Version and Demo badges, headline and description all sit about 12px lower than in the real screen",
+    "Calendar, map and attachment icons next to Timeline sit about 6px further left"
+   ],
+   "blind_id": "D"
+  },
+  "code-only-1": {
+   "layout": 9,
+   "text": 10,
+   "order": 10,
+   "missing": 10,
+   "invented": 10,
+   "overall": 9,
+   "differences": [
+    "Large logo bird is drawn slightly differently",
+    "Book icon differs by a hair"
+   ],
+   "blind_id": "E"
+  },
+  "with-screenify-3": {
+   "layout": 6,
+   "text": 10,
+   "order": 10,
+   "missing": 8,
+   "invented": 5,
+   "overall": 5,
+   "differences": [
+    "Headline wraps differently (Simple note-taking / for your everyday / thoughts.) and the block sits higher",
+    "Wrong card icons (sun for globe, list for book, a squiggle for GitHub) and plain arrows instead of external-link icons; toolbar icons are different glyphs",
+    "A vertical divider line runs down the sidebar that the real screen does not have, and the logo is a different bird"
+   ],
+   "blind_id": "F"
+  }
+ },
+ "home": {
+  "with-screenify-1": {
+   "layout": 8,
+   "text": 8,
+   "order": 10,
+   "missing": 8,
+   "invented": 5,
+   "overall": 6,
+   "differences": [
+    "Packing list is rendered as checkboxes with Offline maps struck through, and the reading list as bullets; the real screen shows the raw text - [ ] Passport, - Piranesi",
+    "November 2026 calendar heading is much larger",
+    "Composer is shorter (Private and Save row about 8px higher), shifting every card up"
+   ],
+   "blind_id": "A"
+  },
+  "code-only-2": {
+   "layout": 7,
+   "text": 7,
+   "order": 10,
+   "missing": 7,
+   "invented": 4,
+   "overall": 5,
+   "differences": [
+    "Header shows the Memos bird logo and name instead of the pink avatar and screenify",
+    "Packing and reading lists rendered as checkboxes and bullets instead of raw - [ ] text",
+    "Composer is shorter, shifting the cards up"
+   ],
+   "blind_id": "B"
+  },
+  "code-only-1": {
+   "layout": 8,
+   "text": 7,
+   "order": 10,
+   "missing": 8,
+   "invented": 5,
+   "overall": 6,
+   "differences": [
+    "Packing and reading lists rendered as checkboxes and bullets instead of raw - [ ] text",
+    "Third memo (Welcome note) says 2 minutes ago instead of 1 minute ago",
+    "Composer is shorter, shifting the cards up"
+   ],
+   "blind_id": "C"
+  },
+  "code-only-3": {
+   "layout": 7,
+   "text": 6,
+   "order": 10,
+   "missing": 7,
+   "invented": 4,
+   "overall": 4,
+   "differences": [
+    "Header shows the Memos bird logo and name instead of the pink avatar and screenify",
+    "Packing and reading lists rendered as checkboxes and bullets instead of raw - [ ] text, with tighter spacing",
+    "Third memo says 2 minutes ago instead of 1 minute ago, and the composer is shorter"
+   ],
+   "blind_id": "D"
+  },
+  "with-screenify-2": {
+   "layout": 7,
+   "text": 10,
+   "order": 10,
+   "missing": 9,
+   "invented": 7,
+   "overall": 7,
+   "differences": [
+    "Colour emoji toolbar icons (calendar, map, paperclip, magnifier) and a hamburger glyph before Timeline, with no Timeline pill background",
+    "Avatar is a plain pink dot rather than a person avatar; calendar grid is shifted right and the Views and Tags sections sit lower",
+    "Memo cards are taller, so the list ends about 30px lower"
+   ],
+   "blind_id": "E"
+  },
+  "with-screenify-3": {
+   "layout": 7,
+   "text": 10,
+   "order": 10,
+   "missing": 9,
+   "invented": 7,
+   "overall": 7,
+   "differences": [
+    "Toolbar icons are different glyphs (grid, list, x-circle, pin) instead of calendar, map, paperclip and search",
+    "Avatar is a plain pink dot; calendar heading and grid sit about 7px higher",
+    "Memo cards are slightly taller, so the list ends about 25px lower"
+   ],
+   "blind_id": "F"
+  }
+ }
+}

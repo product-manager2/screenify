@@ -1,0 +1,56 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Memos</title><meta name="viewport" content="width=1440"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#26231c;background:#faf9f6;min-height:900px}
+.side{position:fixed;left:0;top:0;bottom:0;width:256px;background:#f4f1ea;border-right:1px solid #e4e0d6;padding:0 12px;overflow:hidden}
+.main{margin-left:256px;min-height:900px}
+.banner{height:37px;background:#f1eee6;border-bottom:1px solid #e4e0d6;display:flex;justify-content:center;align-items:center;gap:8px;font-size:13px}
+.banner b{font-weight:600}.banner span{color:#6b665b}.banner a{color:#2b5584;font-weight:500;text-decoration:none}
+.sw{height:52px;display:flex;align-items:center;padding:0 6px;gap:8px}
+.sw .ava{width:20px;height:20px;border-radius:50%;background:#d9577f}
+.sw .nm{font:700 17px Georgia,"Times New Roman",serif;color:#1f1c16}
+.sw .chev{color:#8a8578;font-size:11px}
+.sw .new{margin-left:auto;width:28px;height:28px;border:1px solid #d6d1c4;border-radius:6px;background:#faf9f6;display:grid;place-items:center;font-size:14px;margin-right:-6px}
+.nav{display:flex;align-items:center;height:28px;margin-top:0;gap:0}
+.nav .tl{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:6px;font-size:13px;color:#3a362c}
+.nav .tl.on{background:#e6e2d7;border:0}
+.nav i{font-style:normal;width:32px;text-align:center;color:#6b665b;font-size:14px}
+.nav .sp{flex:1}
+.hr{border-top:1px solid #e4e0d6;margin:10px -12px 0}
+.item{display:flex;align-items:center;gap:10px;height:30px;padding:0 8px;margin-top:0;border-radius:6px;font-size:13px;color:#3a362c}
+.item.on{background:#e6e2d7;font-weight:600}
+.item .ic{width:14px;color:#8a8578;text-align:center;font-size:13px}
+.item .ex{margin-left:auto;color:#a8a396;font-size:11px}
+.sec{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8a8578;padding:0 8px;height:20px;margin-top:10px;display:flex;align-items:center}
+
+.nav .tl{border:0}
+.cal{margin:20px 0 0 8px;width:224px}
+.ch{display:flex;align-items:center;height:20px;font-size:13px}.ch b{font-weight:500;flex:1}
+.ar{width:26px;text-align:center;color:#6b665b;font-size:20px;line-height:14px}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);margin:6px -4px 0 0;font-size:12.5px;width:228px}
+.cg span{height:33.5px;display:grid;place-items:center;color:#2b2820}
+.cg .wd{height:30px;font-size:10.5px;color:#8a8578;font-weight:500}
+.cg .o{color:#b8b3a4}
+.cg .td{background:#8497aa;color:#fff;font-weight:600;border-radius:6px;width:30px;height:24px;margin:auto;position:relative}
+.cg .td:after{content:"";position:absolute;bottom:1px;left:13px;width:3px;height:3px;border-radius:50%;background:#2b3a4d}
+.sec2{font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:#8a8578;padding:0 8px;margin-top:20px;height:18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.dots{font-size:16px;letter-spacing:1px;color:#8a8578;margin-right:-4px}
+.tagrow{display:flex;align-items:center;height:30px;padding:0 8px;font-size:13.5px;color:#3a362c}
+.tagrow .hs{width:24px;color:#b3aea0;font-size:15px}
+.tagrow em{font-style:normal;margin-left:auto;color:#8a8578;font-size:11px;padding-right:2px}
+.feed{width:672px;margin:24px auto 0;padding-left:0;position:relative;left:-0px}
+.main{padding:0}
+.ed{border:1px solid #e4e0d6;border-radius:8px;background:#fdfcfa;height:94px;padding:15px 16px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.ph{font-size:16px;color:#9d998d;line-height:20px;margin-top:0}
+.eb{display:flex;align-items:center;gap:12px;margin-top:21px}
+.plus{width:28px;height:28px;border:1px solid #d6d1c4;border-radius:6px;display:grid;place-items:center;font-size:18px;color:#4a463b;background:#faf9f6}
+.vis{font-size:12.5px;color:#4a463b;display:flex;align-items:center;gap:4px}.vis em{font-style:normal;font-size:11px;color:#8a8578}
+.save{margin-left:auto;background:#a2b0c4;color:#fff;font-weight:600;font-size:13px;border-radius:6px;padding:0 10px;height:28px;display:grid;place-items:center}
+.mc{border:1px solid #e4e0d6;border-radius:8px;background:#fdfcfa;padding:15px 16px 14px;margin-bottom:9px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.mt{display:flex;justify-content:space-between;font-size:12px;color:#6b665b;line-height:16px}
+.mo{font-size:16px;color:#6b665b;line-height:10px;margin-right:-1px}
+.mb{font-size:16px;line-height:24px;margin-top:16px;color:#26231c}
+.mb div{min-height:24px}
+.chip{display:inline-block;border:1px solid #6b8bb0;background:#e1e9f3;color:#2b5584;border-radius:10px;padding:0 6px;font-size:14px;line-height:18px;margin-left:1px}
+</style></head><body><aside class="side"><div class="sw"><span class="ava"></span><span class="nm">screenify</span><span class="chev">&#x2195;</span><span class="new">&#x270E;</span></div>
+<div class="nav"><span class="tl">&#x2630; Timeline &#x2304;</span><span class="sp"></span><i>&#x1F4C5;&#xFE0E;</i><i>&#x1F5FA;&#xFE0E;</i><i>&#x1F4CE;&#xFE0E;</i><i style="margin-left:0">&#x1F50D;&#xFE0E;</i></div>
+<div class="cal"><div class="ch"><b>November 2026</b><span class="ar">&#x2039;</span><span class="ar">&#x203A;</span></div><div class="cg"><span class="wd">S</span><span class="wd">M</span><span class="wd">T</span><span class="wd">W</span><span class="wd">T</span><span class="wd">F</span><span class="wd">S</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span class="td">14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span><span class="o">1</span><span class="o">2</span><span class="o">3</span><span class="o">4</span><span class="o">5</span></div></div><div class="sec2" style="margin-top:28px">Views</div><div class="item" style="padding:0 8px;height:32px"><span class="ic" style="font-size:16px">+</span>Create view</div><div class="sec2" style="margin-top:22px">Tags<span class="dots">&middot;&middot;&middot;</span></div><div class="tagrow"><span class="hs">#</span>books<em>1</em></div><div class="tagrow"><span class="hs">#</span>personal<em>1</em></div><div class="tagrow"><span class="hs">#</span>project<em>1</em></div></aside><div class="main"><div class="banner"><b>Memos demo</b><span>Feel free to explore! This demo is reset periodically.</span><a href="#">Deploy your own Memos</a></div><div class="feed"><div class="ed"><div class="ph">Any thoughts...</div><div class="eb"><span class="plus">+</span><span class="vis">&#x1F512;&#xFE0E; Private <em>&#x2304;</em></span><span class="save">Save</span></div></div><article class="mc"><div class="mt"><span>1 minute ago</span><span class="mo">&#x22EE;</span></div><div class="mb"><div>Draft: notes from the design review <span class="chip">#project</span></div></div></article><article class="mc"><div class="mt"><span>1 minute ago</span><span class="mo">&#x22EE;</span></div><div class="mb"><div>Call the dentist on Monday morning</div></div></article><article class="mc"><div class="mt"><span>1 minute ago</span><span class="mo">&#x22EE;</span></div><div class="mb"><div>Welcome note: this is my space for quick thoughts <span class="chip">#personal</span></div></div></article><article class="mc"><div class="mt"><span>2 minutes ago</span><span class="mo">&#x22EE;</span></div><div class="mb"><div>Packing list for the coast trip</div><div>- [ ] Passport</div><div>- [ ] Charger</div><div>- [x] Offline maps</div></div></article><article class="mc"><div class="mt"><span>2 minutes ago</span><span class="mo">&#x22EE;</span></div><div class="mb"><div>Reading list for November <span class="chip">#books</span></div><div>- Piranesi</div><div>- The Overstory</div></div></article></div></div></body></html>
