@@ -22,7 +22,8 @@
     "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "prepare": "npm run build"
   },
   "keywords": [
     "screenshots",
@@ -40,5 +41,13 @@
     "@types/node": "^24.19.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/product-manager2/screenify.git"
+  },
+  "homepage": "https://github.com/product-manager2/screenify#readme",
+  "bugs": {
+    "url": "https://github.com/product-manager2/screenify/issues"
   }
 }

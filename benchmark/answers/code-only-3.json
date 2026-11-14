@@ -1,0 +1,22 @@
+{
+"1":"Welcome back.",
+"2":"A language picker (globe icon, shows the current language, English by default) and a theme select (shows 'Sync with system' with a monitor icon by default), side by side in two columns.",
+"3":"\"Don't have an account yet?\" followed by a 'Sign up' link (primary-colored).",
+"4":"Group heading 'Basic'; links in order: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import (no Admin group for a non-admin).",
+"5":"Preferences (page title), then groups: Appearance, Memo defaults, Uploads & privacy, This device.",
+"6":"Save media metadata: off; Link preview: on; Double-click to edit: off.",
+"7":"Theme shows 'Sync with system'; Default memo visibility shows 'Private' (with lock icon).",
+"8":"Any thoughts...",
+"9":"Left: a '+' (Add) icon button, then the audience menu (lock icon 'Private' with a chevron); right: a disabled 'Save' button.",
+"10":"Header: space switcher/Memos logo with a 'New memo' pencil icon button; navigation row (Timeline, Calendar, Map, Attachments, Search icon at far right); divider; Statistics (month navigator + activity calendar heatmap); Views section (with a '+ create' row when empty); Tags section (only if tags exist, with a more menu).",
+"11":"Only the current page shows a text label (Timeline on Home, shown as 'Timeline'); the others (Calendar, Map, Attachments, Search) are icon-only with tooltips.",
+"12":"'Memos demo' then 'Feel free to explore! This demo is reset periodically.' and a link 'Deploy your own Memos'; a full-width muted bar at the top of the main content area, above the page content (right of the sidebar).",
+"13":"Filters: All, Unread, Archived (with counts). Empty state: an illustration with 'No data found.' (for Unread 'No unread notifications', Archived 'No archived notifications').",
+"14":"An 'Archived' heading with archive icon, then a placeholder illustration with the text 'No data found.'",
+"15":"The page you are looking for can't be found. (with a large '404' below)",
+"16":"Official Website, Documents, API Docs, GitHub Repo, Web Clipper, Sponsor Memos (no welcome guide card in demo mode).",
+"17":"Account Information (avatar, name, @username, Edit and Change password buttons), Statistics (attachment storage), Usage limits (only if limits are set), SSO Accounts (linked identities table), Danger area (Delete account).",
+"18":"Top-left: the relative timestamp (a permalink; creator avatar/name only on mixed feeds). Top-right: reaction picker, a visibility icon if not Private, and the three-dot action menu.",
+"19":"As a rounded pill (rounded-full, bordered, light primary tint background with primary-colored text) containing the #tag text.",
+"20":"A # icon, the tag name (segments separated by '/'), and a right-aligned memo count."
+}

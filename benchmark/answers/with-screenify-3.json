@@ -1,0 +1,22 @@
+{
+"1":"Welcome back.",
+"2":"A language selector (shows 'English' with a globe icon) and a theme selector (shows 'System' with a monitor icon).",
+"3":"\"Don't have an account yet?\" followed by a 'Sign up' link (to /auth/signup).",
+"4":"Group heading 'BASIC'; links: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import.",
+"5":"Appearance, Memo defaults, Uploads & privacy, This device (under the page title 'Preferences').",
+"6":"Save media metadata: off; Link preview: on; Double-click to edit: off.",
+"7":"Theme shows 'Sync with system'; Default memo visibility shows 'Private'.",
+"8":"Any thoughts...",
+"9":"A '+' (Add) button, a visibility selector showing 'Private' with lock icon and dropdown, then a Save button (disabled/greyed) at far right.",
+"10":"Top: space switcher (avatar, space name e.g. 'screenify' with chevron) and a New memo (compose) icon button; navigation row; month calendar (November 2026 with prev/next arrows); VIEWS section with 'Create view'; TAGS section (with ... menu) listing tags with counts.",
+"11":"Only 'Timeline' (with a dropdown chevron) shows a text label; Calendar, Map, Attachments and Search are icon-only.",
+"12":"'Memos demo  Feel free to explore! This demo is reset periodically.' with a 'Deploy your own Memos' link; a banner strip across the very top of the page, above the content (centered, right of the sidebar).",
+"13":"Filters: All, Unread, Archived (under INBOX heading). Empty state shows 'No data found.' under the 'Inbox' heading.",
+"14":"Heading 'Archived' with the text 'No data found.'",
+"15":"'The page you are looking for can't be found.' and '404'.",
+"16":"Official Website; Documents; API Docs; GitHub Repo; Web Clipper; Sponsor Memos.",
+"17":"Account Information (@username, Edit, Change password); Statistics (attachment storage); Usage limits (memos, storage, memo content, largest file); SSO Accounts (table, 'No SSO found.'); Danger area (Delete account).",
+"18":"Top-left: relative timestamp link (e.g. '1 minute ago'); top-right: a three-dot vertical 'More' menu button.",
+"19":"As a rounded pill/chip badge with blue-tinted background and border, text like '#books'.",
+"20":"A '#' hash icon, the tag name, and on the right the memo count (e.g. 'books 1')."
+}

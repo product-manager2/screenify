@@ -1,29 +1,80 @@
 # Screenify
 
-An organised, searchable library of screenshots of **your** app, built for coding agents.
+**Show your coding agent what your app looks like.** Screenify builds an organised, searchable
+library of screenshots of *your* app — every screen, its states, and its small flows — and keeps
+it in your repository where the agent can open it.
 
-Your coding agent reads the repository and works out its features, screens, states and small
-flows (create, edit, delete, submit); Screenify stores that plan, captures each item with a
-headless browser, and files every image under a long,
-descriptive path with a text sidecar next to it. Small flows also get a **flow board**: one image
-with the steps side by side and a numbered caption under each. One `INDEX.md` lists everything,
-and Screenify knows which captures went stale because the code that renders them changed.
+![A flow board: the steps of one action in a single image, each with a numbered caption](benchmark/library-sample/sign-up-new-account--desktop-1440x900--app-default.png)
+
+## Why an agent needs screenshots
+
+A coding agent knows your app only as source code. Ask it to add a settings toggle, draw a mockup
+of a new page, or suggest what to build next, and it first has to *imagine* the screen from
+components, styles and translation files. It gets a lot right and some things wrong: which label a
+control really shows, what is on the page by default, what only appears on hover, what the empty
+state says. Those small misses are why a generated mockup looks "off" and why a new screen does
+not match its neighbours.
+
+The alternative is for the agent to start the app, sign in, click to the right place and take a
+screenshot, every time it needs to look. That is slow, and most sessions skip it.
+
+Screenify does that work once, files the result, and keeps it current:
+
+| | Without Screenify | With Screenify |
+| --- | --- | --- |
+| "What does the settings page look like?" | Reads the router, the page, its components and the locale files, then infers the layout | Opens one image and its text sidecar |
+| Building a new screen | Copies patterns it inferred from code; spacing, labels and defaults drift | Looks at the neighbouring screens first and matches them |
+| Mockups, docs, release notes | Draws from imagination | Works from real screens and real copy |
+| Suggesting features | Reasons about files | Sees the product a user sees, including empty and error states |
+| Finding where a label lives | Greps the code, guesses which screen renders it | Greps the sidecars; each names the image, the route and the source files |
+| After the code changes | Nothing tells it the picture in its head is out of date | Stale captures are flagged and re-captured from stored recipes, no model needed |
+
+### Measured once, on a real app
+
+We ran the same 20 questions about what the open-source notes app
+[Memos](https://github.com/usememos/memos) shows on screen, three times with only the code and
+three times with a Screenify library in the checkout. Same model, same prompt, blind grading.
+
+| | Code only | Code + Screenify |
+| --- | --- | --- |
+| Correct answers | 55 / 60 (92%) | **60 / 60 (100%)** |
+| Time per run | 110 s | **30 s** |
+| Tool calls per run | 27 | **9** |
+| Tokens per run | 185k | **125k** |
+
+It is one small test on one tidy codebase, and the library itself took about 14 minutes of cheap
+model time to build. The questions, the answer key, every raw answer, the grades and the limits
+of the test are in [`benchmark/`](benchmark/).
+
+## What you get
+
+Your agent reads the repository and works out its features, screens, states and small flows
+(create, edit, delete, submit). Screenify stores that plan, captures each item with a headless
+browser, and files every image under a long, descriptive path with a text sidecar next to it.
+Small flows also get a **flow board**: one image with the steps side by side and a numbered
+caption under each. One `INDEX.md` lists everything, and Screenify knows which captures went stale
+because the code that renders them changed.
 
 An agent asked "what does the empty task list look like on a phone?" opens
-`screenify-out/screens/web/tasks/task-list/task-list--empty--mobile-390x844--app-default.png`, or greps
-the sidecars for a button label, without starting the app.
+`screenify-out/screens/web/tasks/task-list/task-list--empty--mobile-390x844--app-default.png`, or
+greps the sidecars for a button label, without starting the app.
+
+![A captured screen: the Memos home timeline](benchmark/library-sample/home--filled--desktop-1440x900--app-default.png)
 
 ## The one command
 
 ```sh
-npx screenify
+npx github:product-manager2/screenify
 ```
+
+(Screenify is not on npm yet; until it is, this runs it straight from GitHub.)
 
 In a repository with no library yet, that runs `screenify init`. Then ask your agent to use the
 `screenify` skill (or type `/screenify` in Claude Code, `$screenify` in Codex). The agent asks you
 one question, which platforms to cover, and does the rest: a discovery agent reads the code and
-writes the plan, then a capture agent boots the app with seed data using the repo's own scripts,
-writes small JSON recipes, and runs them.
+writes the plan, then a capture agent starts the app using the repo's own scripts, writes small
+JSON recipes, and runs them. If something in your environment is missing (sample data for a
+"filled" screen, an account), it tells you and asks before changing anything.
 
 ## Discovery is done by an agent
 
@@ -247,7 +298,7 @@ they touch, `screenify refresh` replays the stale recipes, and the capture agent
 and broken recipes. Plain cron, replaying recipes only, needs no model at all:
 
 ```cron
-0 3 * * * cd /path/to/repo && npx screenify refresh >> /tmp/screenify.log 2>&1
+0 3 * * * cd /path/to/repo && npx github:product-manager2/screenify refresh >> /tmp/screenify.log 2>&1
 ```
 
 ## Safety rules

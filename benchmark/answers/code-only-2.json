@@ -1,0 +1,22 @@
+{
+"1":"\"Welcome back.\" (small muted subtitle under the Sign in heading)",
+"2":"A language (locale) select and a theme select, side by side in a two-column row below the card. Language shows the current language (English); Theme shows \"Sync with system\" (with a monitor icon) by default.",
+"3":"\"Don't have an account yet?\" followed by a primary-colored \"Sign up\" link.",
+"4":"Group heading \"Basic\"; links: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import (no Admin group for a non-admin).",
+"5":"Preferences (page title), then Appearance, Memo defaults, Uploads & privacy, This device.",
+"6":"Save media metadata: off; Link preview: on; Double-click to edit: off.",
+"7":"Theme shows \"Sync with system\"; Default memo visibility shows \"Private\" (with a lock icon).",
+"8":"Any thoughts...",
+"9":"Left: a \"+\" (Add) insert menu button, then the audience/visibility dropdown (icon + \"Private\" + chevron). Right: a disabled \"Save\" button (no Cancel).",
+"10":"Header with the space switcher (left) and a New memo (pencil) icon button (right); navigation pill row (Timeline, Calendar, Map, Attachments, Search); a divider; Statistics block (month navigator + activity calendar heatmap); Views section (with a 'Create view' row/plus when none); Tags section (with a more menu) listing tags.",
+"11":"Only the current page shows a text label, which on Home is \"Timeline\". Calendar, Map, Attachments and Search are icon-only (with tooltips).",
+"12":"\"Memos demo\" - \"Feel free to explore! This demo is reset periodically.\" with a \"Deploy your own Memos\" link; a full-width muted banner strip at the top of the main content area (above the page content, right of the sidebar), centered.",
+"13":"Sidebar section \"Inbox\" with filters All, Unread, Archived (each with a count). Empty: an illustration with the text \"No data found.\" (for Unread: \"No unread notifications\", Archived: \"No archived notifications\").",
+"14":"A header with an archive icon and the title \"Archived\" and the list is empty (no memos); sidebar shows statistics/tags.",
+"15":"\"The page you are looking for can't be found.\" and a large \"404\".",
+"16":"Official Website, Documents, API Docs, GitHub Repo, Web Clipper, Sponsor Memos (no welcome-guide card in demo mode).",
+"17":"My Account title; Account Information (avatar, name, @username, Edit and Change password buttons); Statistics (attachment storage); Usage limits (only if limits set); Linked accounts/identity providers table (SSO accounts); Danger area with Delete account.",
+"18":"Top-left: relative time of the memo (creator avatar/name only if shown, and space badge). Top-right: reaction (smiley) button on hover, a visibility icon if not private, and a three-dot actions menu.",
+"19":"As a rounded pill-style highlighted token (theme or custom color) with the text #books, clickable to filter.",
+"20":"A # icon, the tag name (nested segments separated by /), and the memo count at the right end."
+}

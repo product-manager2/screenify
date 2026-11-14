@@ -1,0 +1,22 @@
+{
+"1":"Welcome back.",
+"2":"Two dropdown selectors: a language selector showing 'English' (globe icon) and a theme selector showing 'System' (monitor icon).",
+"3":"\"Don't have an account yet?\" followed by a 'Sign up' link (to /auth/signup).",
+"4":"Group heading 'Basic'; links in order: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import.",
+"5":"Appearance; Memo defaults; Uploads & privacy; This device.",
+"6":"Save media metadata: off; Link preview: on; Double-click to edit: off.",
+"7":"Theme shows 'Sync with system'; Default memo visibility shows 'Private'.",
+"8":"Any thoughts...",
+"9":"A '+' (add/insert) button, then a 'Private' visibility dropdown on the left; a Save button (disabled, greyed) on the right.",
+"10":"Top: space switcher (avatar + username 'screenify') with a New memo (compose) icon button; navigation row (Timeline, Calendar, Map, Attachments, Search); month calendar (November 2026 with prev/next arrows); Views section with 'Create view'; Tags section (heading with more '...' menu) listing tags.",
+"11":"Timeline shows an icon plus the text label (with a dropdown chevron); Calendar, Map, Attachments and Search are icon-only.",
+"12":"'Memos demo  Feel free to explore! This demo is reset periodically.' with a 'Deploy your own Memos' link, in a banner strip across the very top of the page, above the main content.",
+"13":"Sidebar heading 'Inbox' with filter buttons All (selected by default), Unread, Archived; empty page shows heading 'Inbox' and 'No data found.'",
+"14":"Heading 'Archived' with the text 'No data found.'",
+"15":"'The page you are looking for can't be found.' and below it '404'.",
+"16":"Official Website; Documents; API Docs; GitHub Repo; Web Clipper; Sponsor Memos.",
+"17":"Account Information (@username, Edit, Change password); Statistics (Attachment storage); Usage limits (Memos, Storage, Memo content, Largest file); SSO Accounts (table, 'No SSO found.'); Danger area (Delete account).",
+"18":"Top-left: relative timestamp link (e.g. '1 minute ago'); top-right: three-dot 'More' menu button.",
+"19":"As a small rounded pill/chip with blue text and a light blue background and border, e.g. '#books'.",
+"20":"A '#' icon, the tag name (e.g. books), and the memo count right-aligned (e.g. 1)."
+}

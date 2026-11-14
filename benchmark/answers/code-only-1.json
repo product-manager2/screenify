@@ -1,0 +1,22 @@
+{
+"1":"Welcome back.",
+"2":"A language picker (globe icon, shows the current language: English) and a theme picker (monitor icon, shows System, i.e. sync with system), side by side in two columns.",
+"3":"\"Don't have an account yet?\" followed by a \"Sign up\" link.",
+"4":"Group heading \"Basic\"; links in order: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import.",
+"5":"Preferences (page title), then groups: Appearance, Memo defaults, Uploads & privacy, This device.",
+"6":"Save media metadata: off; Link preview: on; Double-click to edit: off.",
+"7":"Theme shows \"Sync with system\"; Default memo visibility shows Private (with its icon).",
+"8":"Any thoughts...",
+"9":"Left: a \"+\" (Add) icon button, then the visibility/audience menu showing \"Private\" with an icon and chevron. Right: a disabled \"Save\" button.",
+"10":"Header row with the space switcher and a new-memo (pencil) button; nav row (Timeline, Calendar, Map, Attachments, Search); divider; Statistics block (month navigator and activity calendar heatmap); Views section (with a Create/plus row); Tags section (list with a more menu), shown if tags exist.",
+"11":"Timeline shows an icon plus the text label (on Home); Calendar, Map, Attachments and Search are icon-only (tooltips on hover).",
+"12":"A full-width banner at the top of the main content area, above the page content: \"Memos demo\" \"Feel free to explore! This demo is reset periodically.\" and a \"Deploy your own Memos\" link.",
+"13":"Filters: All, Unread, Archived (each with a count) under an Inbox heading. Empty: illustration with \"No data found.\" (under Unread: \"No unread notifications\"; under Archived: \"No archived notifications\").",
+"14":"An \"Archived\" heading with archive icon, and an empty-state illustration with \"No data found.\"",
+"15":"\"The page you are looking for can't be found.\" and a large \"404\".",
+"16":"Official Website, Documents, API Docs, GitHub Repo, Web Clipper, Sponsor Memos (no welcome guide card in demo mode).",
+"17":"Account Information (avatar, name, @username, Edit and Change password buttons); Statistics (Attachment storage); SSO Accounts (linked identities table); Danger area (Delete account).",
+"18":"Top-left: the relative timestamp (a permalink; creator avatar and name before it when shown). Top-right: reaction picker (on hover), visibility icon if not private, and the more actions menu.",
+"19":"As a rounded pill with a primary-colored border, tinted background and text (or the user's custom tag color), showing #books, clickable to filter.",
+"20":"A # icon, the tag name (nested tags with / separators), and the memo count on the right."
+}

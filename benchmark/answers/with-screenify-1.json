@@ -1,0 +1,22 @@
+{
+"1": "Welcome back.",
+"2": "A language selector (shows 'English' with a globe icon) and a theme selector (shows 'System' with a monitor icon), side by side at the bottom centre.",
+"3": "\"Don't have an account yet?\" followed by a 'Sign up' link.",
+"4": "Group heading 'BASIC'; links: My Account, Spaces, Access Tokens, Preferences, Editor, Webhooks, Tags, Export & Import.",
+"5": "Appearance, Memo defaults, Uploads & privacy, This device.",
+"6": "Save media metadata: off; Link preview: on; Double-click to edit: off.",
+"7": "Theme shows 'Sync with system'; Default memo visibility shows 'Private' (with a lock icon).",
+"8": "Any thoughts...",
+"9": "A '+' insert button at left, a visibility selector showing 'Private' (lock icon), and a 'Save' button at the far right (disabled/greyed while empty).",
+"10": "Top: user avatar + name (e.g. 'screenify') with a dropdown chevron and a compose/edit icon button; navigation row; month calendar (November 2026) with prev/next arrows; VIEWS section with 'Create view'; TAGS section (with '...' menu) listing tags.",
+"11": "'Timeline' (with dropdown chevron) shows a text label; Calendar, Map, Attachments and Search are icon-only.",
+"12": "'Memos demo  Feel free to explore! This demo is reset periodically.  Deploy your own Memos' (link) - a banner bar across the very top of the page, centered above the main content.",
+"13": "Sidebar section INBOX with filters: All, Unread, Archived. Empty page shows heading 'Inbox' and 'No data found.'",
+"14": "Heading 'Archived' with 'No data found.'",
+"15": "'The page you are looking for can't be found.' and '404'.",
+"16": "Official Website, Documents, API Docs, GitHub Repo, Web Clipper, Sponsor Memos.",
+"17": "Account Information (@username with Edit and Change password buttons), Statistics (attachment storage), Usage limits (Memos, Storage, Memo content, Largest file), SSO Accounts ('No SSO found.'), Danger area (Delete account).",
+"18": "Top-left: relative timestamp (e.g. '1 minute ago'); top-right: a three-dot (vertical ellipsis) menu button.",
+"19": "As a rounded pill/chip with blue text and light blue background and border, showing '#books'.",
+"20": "A '#' icon, the tag name (e.g. books), and a count of memos right-aligned (e.g. 1)."
+}
