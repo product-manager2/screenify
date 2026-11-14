@@ -33,11 +33,16 @@ export interface GitState {
   dirty: boolean;
 }
 
-/** Reads the current commit, branch and whether the tree has uncommitted changes. */
-export function gitState(cwd: string): GitState {
+/**
+ * Reads the current commit and branch, and whether any of `sources` (repo-relative) has uncommitted
+ * changes, untracked new files included. Only a capture's own sources count: unrelated work, and
+ * Screenify's own edits to .gitignore or the agent instruction files, never make a capture dirty.
+ * With no sources, dirty is false.
+ */
+export function gitState(cwd: string, sources: string[] = []): GitState {
   const commit = git(cwd, ['rev-parse', 'HEAD']);
   const branch = git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  const status = git(cwd, ['status', '--porcelain', '--untracked-files=no']);
+  const status = sources.length ? git(cwd, ['status', '--porcelain', '--untracked-files=all', '--', ...sources]) : '';
   return { commit, branch: branch === 'HEAD' ? null : branch, dirty: !!status };
 }
 

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import type { Browser, Locator as PwLocator, Page } from 'playwright-core';
 import { slug, type Viewport } from './naming.js';
-import { stepAction, substituteEnv, textList, type Locator, type Recipe, type ShotSpec, type Step } from './recipe.js';
+import { stepAction, substituteEnv, textList, withRunId, type Locator, type Recipe, type ShotSpec, type Step } from './recipe.js';
 import { scrub } from './secrets.js';
 import { writeFileAtomic } from './fsutil.js';
 
@@ -67,28 +67,28 @@ export interface Replay {
   failures: StepError[];
 }
 
-/** Resolves a recipe locator to a Playwright locator. */
-export function toPlaywright(page: Page, l: Locator): PwLocator {
+/** Rich-text editors and other editable regions, whose typed text must not count as page content. */
+const EDITABLE = ':is([contenteditable]:not([contenteditable="false"]), [role="textbox"])';
+/** Elements outside every editable region. */
+const NOT_EDITABLE = `css=:not(${EDITABLE}):not(${EDITABLE} *)`;
+
+/**
+ * Resolves a recipe locator to a Playwright locator, inside its `within` locator when it has one.
+ * `${RUN_ID}` in names and text becomes the run id. A text locator skips editable regions when
+ * `ignoreFields` says so, or by default when `fieldsIgnored` (what `waitFor` passes).
+ */
+export function toPlaywright(page: Page, l: Locator, fieldsIgnored = false): PwLocator {
+  if (typeof l === 'string') return page.locator(withRunId(l));
+  const root: Page | PwLocator = l.within ? toPlaywright(page, l.within) : page;
   let loc: PwLocator;
-  let nth: number | undefined;
-  if (typeof l === 'string') loc = page.locator(l);
-  else if ('role' in l) {
-    loc = page.getByRole(l.role as Parameters<Page['getByRole']>[0], { name: l.name, exact: l.exact });
-    nth = l.nth;
-  } else if ('text' in l) {
-    loc = page.getByText(l.text, { exact: l.exact });
-    nth = l.nth;
-  } else if ('label' in l) {
-    loc = page.getByLabel(l.label, { exact: l.exact });
-    nth = l.nth;
-  } else if ('testId' in l) {
-    loc = page.getByTestId(l.testId);
-    nth = l.nth;
-  } else {
-    loc = page.locator(l.css);
-    nth = l.nth;
-  }
-  return nth === undefined ? loc : loc.nth(nth);
+  if ('role' in l) loc = root.getByRole(l.role as Parameters<Page['getByRole']>[0], { name: l.name === undefined ? undefined : withRunId(l.name), exact: l.exact });
+  else if ('text' in l) {
+    loc = root.getByText(withRunId(l.text), { exact: l.exact });
+    if (l.ignoreFields ?? fieldsIgnored) loc = loc.and(page.locator(NOT_EDITABLE));
+  } else if ('label' in l) loc = root.getByLabel(withRunId(l.label), { exact: l.exact });
+  else if ('testId' in l) loc = root.getByTestId(withRunId(l.testId));
+  else loc = root.locator(withRunId(l.css));
+  return l.nth === undefined ? loc : loc.nth(l.nth);
 }
 
 /** Resolves a recipe `goto` target against the base URL; refuses anything that is not http or https. */
@@ -213,8 +213,9 @@ async function runStep(page: Page, step: Step, opts: RunOptions, timeout: number
   else if ('waitFor' in step) {
     const t = step.timeout ?? Math.max(timeout, 15_000);
     const w = step.waitFor as any;
-    if (w && typeof w === 'object' && 'url' in w) await page.waitForURL(w.url.includes('*') ? w.url : `**${w.url}*`, { timeout: t });
-    else await toPlaywright(page, w).first().waitFor({ state: 'visible', timeout: t });
+    // The whole path must match, with the landing check's matcher (params and * allowed).
+    if (w && typeof w === 'object' && 'url' in w) await page.waitForURL((u) => routeMatches(w.url, u.pathname), { timeout: t });
+    else await toPlaywright(page, w, true).first().waitFor({ state: 'visible', timeout: t });
   } else if ('wait' in step) await page.waitForTimeout(step.wait);
 }
 
@@ -226,14 +227,45 @@ function expectedRoute(recipe: Recipe, spec: ShotSpec, opts: RunOptions): string
 }
 
 /** Problems a shot's deterministic checks find on the page: landing URL and visible text. */
-async function shotProblems(page: Page, recipe: Recipe, spec: ShotSpec, opts: RunOptions, text: string): Promise<string[]> {
+/**
+ * The `expectUrl` to suggest when the page landed on a longer path under the expected route (a
+ * redirect such as /calendar → /calendar/2026/11): the route plus one `:pN` per extra segment.
+ * Null when the landing path is not under the route.
+ */
+export function redirectSuggestion(route: string, path: string): string | null {
+  const want = route.split(/[?#]/)[0].replace(/\/+$/, '').split('/');
+  const got = path.replace(/\/+$/, '').split('/');
+  if (got.length <= want.length || route.includes('*')) return null;
+  if (!routeMatches(want.join('/') || '/', got.slice(0, want.length).join('/') || '/')) return null;
+  return [...want, ...got.slice(want.length).map((_, i) => `:p${i + 1}`)].join('/');
+}
+
+/** The page's visible text without what is typed into editable regions (a composer is not content). */
+async function textOutsideFields(page: Page): Promise<string> {
+  return page
+    .evaluate((editable: string) => {
+      const hidden = [...document.querySelectorAll<HTMLElement>(editable)].map((el) => [el, el.style.visibility] as const);
+      for (const [el] of hidden) el.style.visibility = 'hidden';
+      const text = document.body?.innerText ?? '';
+      for (const [el, v] of hidden) el.style.visibility = v;
+      return text;
+    }, EDITABLE)
+    .catch(() => '');
+}
+
+/** Problems a shot's deterministic checks find on the page: landing URL and visible text (outside editable regions). */
+async function shotProblems(page: Page, recipe: Recipe, spec: ShotSpec, opts: RunOptions): Promise<string[]> {
   const problems: string[] = [];
   const route = expectedRoute(recipe, spec, opts);
   const path = new URL(page.url()).pathname;
-  if (route && !routeMatches(route, path)) problems.push(`expected ${route}, ended on ${path}`);
-  const visible = normalise(text);
-  for (const t of textList(spec.expect?.visible)) if (!visible.includes(normalise(t))) problems.push(`expected visible text "${t}" is not on the page`);
-  for (const t of textList(spec.expect?.absent)) if (visible.includes(normalise(t))) problems.push(`text "${t}" is on the page but must not be`);
+  if (route && !routeMatches(route, path)) {
+    const suggest = redirectSuggestion(route, path);
+    problems.push(`expected ${route}, ended on ${path}${suggest ? `; add "expectUrl": "${suggest}" if this redirect is expected` : ''}`);
+  }
+  if (!spec.expect) return problems;
+  const visible = normalise(await textOutsideFields(page));
+  for (const t of textList(spec.expect.visible).map(withRunId)) if (!visible.includes(normalise(t))) problems.push(`expected visible text "${t}" is not on the page`);
+  for (const t of textList(spec.expect.absent).map(withRunId)) if (visible.includes(normalise(t))) problems.push(`text "${t}" is on the page but must not be`);
   return problems;
 }
 
@@ -271,7 +303,7 @@ async function expandScrollContainer(page: Page, locator: Locator, timeout: numb
 async function takeShot(page: Page, recipe: Recipe, spec: ShotSpec, step: number, opts: RunOptions, timeout: number): Promise<Shot> {
   await fontsReady(page);
   const rawText = await page.evaluate(() => document.body?.innerText ?? '').catch(() => '');
-  const problems = await shotProblems(page, recipe, spec, opts, rawText);
+  const problems = await shotProblems(page, recipe, spec, opts);
   if (problems.length) throw new ShotCheckError(problems.join('; '));
   const restore = spec.scrollContainer ? await expandScrollContainer(page, spec.scrollContainer, timeout) : null;
   let png: Buffer;

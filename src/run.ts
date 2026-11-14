@@ -1,7 +1,7 @@
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type { Browser } from 'playwright-core';
-import { ensureApp } from './app.js';
+import { ensureApp, httpGet } from './app.js';
 import { invalidSelectors, launchBrowser } from './browser.js';
 import { pixelHash, recordFlow, recordScreen, removeCapture } from './capture.js';
 import { loadConfig, type Config } from './config.js';
@@ -11,7 +11,7 @@ import { writeIndex } from './indexfile.js';
 import { loadManifest, saveManifest, type Manifest } from './manifest.js';
 import { flowBase, recipePath, resolveViewport, screenBase, slug, viewportLabel, type ScreenKey, type ViewportSpec } from './naming.js';
 import { findPlanItem, loadPlan, planItemId, savePlan, settleItemStatus, type Plan, type PlanItem } from './plan.js';
-import { loadRecipe, type Recipe } from './recipe.js';
+import { loadRecipe, newRunId, type Recipe } from './recipe.js';
 import { replayRecipe, routeMatches, runRecipe, StepError, type Shot } from './runner.js';
 import { scrub } from './secrets.js';
 import { frontMatter } from './sidecar.js';
@@ -265,8 +265,7 @@ export async function servedCommit(config: Config, baseUrl: string | null, log: 
   if (!config.versionUrl) return undefined;
   const url = baseUrl ? new URL(config.versionUrl, baseUrl).toString() : config.versionUrl;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    const sha = commitFromBody(await res.text());
+    const sha = commitFromBody((await httpGet(url, 5000)).body);
     if (!sha) log(`warning: ${url} did not answer with {"commit": "<sha>"} or a bare commit hash; captures record no served commit`);
     return sha;
   } catch (err) {
@@ -388,7 +387,7 @@ function itemForShot(ctx: BatchContext, recipe: Recipe, item: PlanItem | undefin
 async function fileShots(ctx: BatchContext, recipe: Recipe, relRecipe: string, item: PlanItem | undefined, runs: ViewportShots[], screens: PendingScreen[]): Promise<{ id: string; item?: PlanItem }[]> {
   const { store, manifest } = ctx;
   const { sources, sourcesFrom } = sourcesFor(recipe, item);
-  const prov = { route: item?.route ?? firstGoto(recipe), sources, sourcesFrom, recipe: relRecipe, git: gitState(store.repoRoot), servedCommit: ctx.served };
+  const prov = { route: item?.route ?? firstGoto(recipe), sources, sourcesFrom, recipe: relRecipe, git: gitState(store.repoRoot, sources), servedCommit: ctx.served };
   if (recipe.kind === 'flow') {
     const filed: { id: string; item?: PlanItem }[] = [];
     for (const r of runs) {
@@ -495,6 +494,7 @@ function requiresFor(ctx: BatchContext, relRecipe: string): string[] | undefined
  */
 export async function runRecipes(store: Store, recipes: string[], opts: RunRecipesOptions = {}): Promise<RecipeResult[]> {
   const log = (line: string) => opts.log?.(scrub(line));
+  newRunId();
   const config = loadConfig(store);
   if (opts.baseUrl) config.baseUrl = opts.baseUrl;
   const manifest = loadManifest(store);

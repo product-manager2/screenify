@@ -5,15 +5,18 @@ import { rememberSecret } from './secrets.js';
 /**
  * Where to find an element. Preference order when writing recipes:
  * role+name, text, label, testId, css. A bare string is CSS. Names and text match as substrings
- * unless `exact: true` ("Filters" alone, not "Open filters").
+ * unless `exact: true` ("Filters" alone, not "Open filters"). `within` scopes the search to another
+ * locator's element ("the item in the feed, not the composer"). A text locator in `waitFor` skips
+ * editable regions (rich-text composers) unless `ignoreFields: false`; inputs and textareas never
+ * match text.
  */
 export type Locator =
   | string
-  | { role: string; name?: string; exact?: boolean; nth?: number }
-  | { text: string; exact?: boolean; nth?: number }
-  | { label: string; exact?: boolean; nth?: number }
-  | { testId: string; nth?: number }
-  | { css: string; nth?: number };
+  | { role: string; name?: string; exact?: boolean; nth?: number; within?: Locator }
+  | { text: string; exact?: boolean; nth?: number; within?: Locator; ignoreFields?: boolean }
+  | { label: string; exact?: boolean; nth?: number; within?: Locator }
+  | { testId: string; nth?: number; within?: Locator }
+  | { css: string; nth?: number; within?: Locator };
 
 /** Text a shot checks on the page before it is filed. */
 export interface ShotExpect {
@@ -109,6 +112,11 @@ export function locatorProblems(l: unknown, where: string): string[] {
   }
   if (o.nth !== undefined && !(Number.isInteger(o.nth) && (o.nth as number) >= 0)) errors.push(`${where}: "nth" must be a whole number from 0`);
   if (o.name !== undefined && typeof o.name !== 'string') errors.push(`${where}: "name" must be a string`);
+  if (o.ignoreFields !== undefined) {
+    if (!('text' in o)) errors.push(`${where}: "ignoreFields" applies to text locators only`);
+    else if (typeof o.ignoreFields !== 'boolean') errors.push(`${where}: "ignoreFields" must be true or false`);
+  }
+  if (o.within !== undefined) errors.push(...locatorProblems(o.within, `${where}: "within"`));
   return errors;
 }
 
@@ -119,6 +127,13 @@ function stepLocators(s: any): [string, unknown][] {
   if (s.press !== undefined && s.on !== undefined) out.push(['"on"', s.on]);
   if (s.waitFor !== undefined && !(s.waitFor && typeof s.waitFor === 'object' && 'url' in s.waitFor)) out.push(['"waitFor"', s.waitFor]);
   return out;
+}
+
+/** Problems with a `waitFor: {"url"}` step: the pattern is matched against the whole path. */
+function urlWaitProblems(s: any, where: string): string[] {
+  if (!(s?.waitFor && typeof s.waitFor === 'object' && 'url' in s.waitFor)) return [];
+  const u = s.waitFor.url;
+  return isText(u) && u.startsWith('/') ? [] : [`${where}: "waitFor": {"url"} must be a path pattern starting with / (the whole path must match, e.g. "/calendar/:year/:month")`];
 }
 
 /**
@@ -219,6 +234,7 @@ export function validateRecipe(r: any): string[] {
     if (s?.wait !== undefined && typeof s.wait !== 'number') errors.push(`${where}: "wait" is milliseconds`);
     if (s?.shot !== undefined) errors.push(...validateShot(s.shot, r.kind, where, typeof r.name === 'string' ? r.name : ''));
     if (s && typeof s === 'object') for (const [k, l] of stepLocators(s)) errors.push(...locatorProblems(l, `${where}: ${k}`));
+    errors.push(...urlWaitProblems(s, where));
   });
   const shots = r.steps.filter((s: any) => s?.shot !== undefined).length;
   if (r.kind !== 'auth' && shots === 0) errors.push('a screen or flow recipe needs at least one "shot" step');
@@ -260,13 +276,36 @@ export function textList(v: string | string[] | undefined): string[] {
   return v === undefined ? [] : Array.isArray(v) ? v : [v];
 }
 
+let currentRunId = '';
+
+/**
+ * Starts a new run id: the value of `${RUN_ID}` for one batch of recipes. It is short and unique
+ * per run (not a secret, never scrubbed), so data a writing flow creates ("Note ${RUN_ID}") never
+ * collides with data a failed earlier run left behind.
+ */
+export function newRunId(): string {
+  currentRunId = `${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 6).padEnd(4, '0')}`;
+  return currentRunId;
+}
+
+/** The current run id, starting one if none is running. */
+export function runId(): string {
+  return currentRunId || newRunId();
+}
+
+/** Replaces `${RUN_ID}` with the current run id; used for values, locator text and expected text. */
+export function withRunId(text: string): string {
+  return text.includes('${RUN_ID}') ? text.split('${RUN_ID}').join(runId()) : text;
+}
+
 /**
  * Replaces `${VAR}` in a recipe value with the environment variable, so recipes never hold secrets.
+ * `${RUN_ID}` is the run id ({@link newRunId}), not an environment variable.
  * Every substituted value is remembered so `scrub` (secrets.ts) removes it from all output; `baseUrl` lets
  * a relative link register its resolved form too. Throws when a referenced variable is not set.
  */
 export function substituteEnv(value: string, env: NodeJS.ProcessEnv = process.env, baseUrl?: string | null): string {
-  return value.replace(/\$\{([A-Z0-9_]+)\}/gi, (_, name: string) => {
+  return withRunId(value).replace(/\$\{([A-Z0-9_]+)\}/gi, (_, name: string) => {
     const v = env[name];
     if (v === undefined) throw new Error(`environment variable ${name} is not set (used in a recipe value)`);
     rememberSecret(v, baseUrl);

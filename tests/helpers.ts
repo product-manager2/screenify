@@ -61,10 +61,21 @@ export function freePort(): Promise<number> {
   });
 }
 
-/** Starts the Taskly fixture server from `repo` on a free port and waits until it answers. */
+/**
+ * Starts the Taskly fixture server from `repo` on a port it picks itself (PORT=0) and reads back, so
+ * parallel test runs can never race for the same port, then waits until it answers.
+ */
 export async function startFixture(repo: string, env: Record<string, string> = {}): Promise<{ port: number; server: ChildProcess }> {
-  const port = await freePort();
-  const server = spawn(process.execPath, ['server.mjs'], { cwd: repo, env: { ...process.env, ...env, PORT: String(port) }, stdio: 'ignore' });
+  const server = spawn(process.execPath, ['server.mjs'], { cwd: repo, env: { ...process.env, ...env, PORT: '0' }, stdio: ['ignore', 'pipe', 'inherit'] });
+  const port = await new Promise<number>((resolve, reject) => {
+    let out = '';
+    server.stdout!.on('data', (d) => {
+      out += d.toString();
+      const m = /127\.0\.0\.1:(\d+)/.exec(out);
+      if (m) resolve(Number(m[1]));
+    });
+    server.once('exit', (code) => reject(new Error(`fixture server exited (${code}) before it listened`)));
+  });
   for (let i = 0; i < 100 && !(await reachable(`http://127.0.0.1:${port}/`)); i++) await new Promise((r) => setTimeout(r, 100));
   return { port, server };
 }

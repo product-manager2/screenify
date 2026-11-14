@@ -205,9 +205,15 @@ replays it with `playwright-core`. Because recipes are stored, a refresh needs n
 
 Steps: `goto`, `click`, `fill`, `press`, `select`, `hover`, `waitFor`, `wait`, `shot`. Locators:
 role and name, text, label, test id, or CSS; names and text match as substrings unless
-`"exact": true`. Recipes live in `screenify-out/recipes/`; `run` copies one from elsewhere in, and
+`"exact": true`, and `"within": <locator>` searches inside another element. `waitFor {"url"}` matches
+the whole path (named params and `*`, like `expectUrl`). Text waits and `expect` ignore what is typed
+into editable regions such as a rich-text composer (`"ignoreFields": false` opts a wait back in), so
+proving a save landed means waiting for the new item where saved items appear. Recipes live in `screenify-out/recipes/`; `run` copies one from elsewhere in, and
 refuses when a different stored copy already exists. `fill` values and `goto` targets support `${ENV_VAR}`
-(a `goto` that reads the environment must stay on the app's origin). Kinds: `screen` (each shot is a
+(a `goto` that reads the environment must stay on the app's origin). `${RUN_ID}` is a short id unique
+to each run (not a secret): writing flows put it in what they create ("Note ${RUN_ID}") so re-runs
+never collide, and clean up through the app's own UI at the end of the recipe; Screenify never
+deletes app data. Kinds: `screen` (each shot is a
 state), `flow` (each shot is a numbered frame and needs a `caption`) and `auth` (signs in once and
 saves the session for recipes that say `"auth": "<name>"`). Every shot carries `shows`, the agent's
 one line on what the image shows, written after looking at it (a `shows` that only repeats the
@@ -220,6 +226,8 @@ The CLI does only deterministic work. Before filing a shot it checks:
 
 - **Landing URL.** The page must be on the shot's `expectUrl`, or for a screen, its plan item's
   route (params as wildcards); otherwise the recipe fails with "expected /goals, ended on /tasks".
+  When the page landed on a longer path under the route, the message suggests the pattern:
+  `add "expectUrl": "/calendar/:p1/:p2" if this redirect is expected`.
 - **Expected text.** `"expect": {"visible": [...], "absent": [...]}` against the page's visible text.
 - **Duplicates.** Two states with identical pixels, or an image identical to another capture, fail;
   so do two identical frames in one flow.
@@ -271,6 +279,7 @@ only on what you agree to; everything else stays skipped with its reason.
 | `plan done <id>` | Marks an item captured; refused while a state has no capture. `--skip-state <state> --note` or `--skip --note` record why something is not captured, as the item's capture note (discovery's `note` is never overwritten, and `plan import` never takes capture fields from its input) |
 | `run <recipe…> [--keep-passing]` | Replays recipes, checks each shot and files the captures |
 | `add <png>` | Files an image captured elsewhere (Flutter, simulators, desktop apps) under the same rules |
+| `describe <capture> --shows [--step N] [--caption]` | Corrects what a filed image or flow frame says without re-running it; a caption change recomposes the board from the stored frames |
 | `remove <capture> --note` | Takes a rejected image out of the library (inside `screens/` and `flows/` only); its state is pending again and the reason is kept as the item's capture note |
 | `board <capture…> --title` | Composes chosen captures into one captioned sheet |
 | `status` | Captures whose source files changed since their commit, and plan items with captured/total states |
@@ -280,7 +289,9 @@ only on what you agree to; everything else stays skipped with its reason.
 
 `--json` is accepted wherever an agent would parse the output, and then stdout carries only JSON
 (notices such as a repaired link go to stderr). `screenify <command> --help` describes one command.
-Run commands from anywhere in the checkout, including inside `screenify-out`.
+Run commands from anywhere in the checkout, including inside `screenify-out`. Outside a git
+repository, commands refuse until `screenify init` has made a local `screenify-out` folder, rather
+than reporting an empty library.
 
 ## How refresh works
 
@@ -289,8 +300,8 @@ diffs the plan item's `sources` (the files the discovery agent said shape that s
 name its own instead) between that commit and the working tree, so a re-discovered source list
 applies to existing captures too. `screenify refresh` replays only the affected recipes. If the app is not
 answering at `baseUrl`, it runs `config.json`'s `start` command, probes `readyUrl` with backoff for
-up to `readyTimeout` seconds, and stops the app afterwards. Without a `start` command it probes for
-`readyTimeout` seconds and then says whether the port refused (the app is down) or timed out (slow). Captures taken off the default branch or from a dirty tree are flagged in the index.
+up to `readyTimeout` seconds, and stops the app afterwards (also when interrupted with Ctrl-C or ended early). Without a `start` command it probes for
+`readyTimeout` seconds and then says whether the port refused (the app is down) or timed out (slow). Captures taken off the default branch are flagged in the index, and so are captures taken while one of their own `sources` had uncommitted changes ("sources uncommitted"; a deterministic `git status` of those files only, so unrelated work and Screenify's own edits to `.gitignore`, `AGENTS.md` or `CLAUDE.md` never flag a capture).
 
 Schedule it however you like. The skill offers a nightly or weekly run through your agent's
 scheduler: `screenify discover` lists changed files, the discovery agent updates only the items

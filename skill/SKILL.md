@@ -79,7 +79,8 @@ Subagents cannot ask the user anything, which is why the questions below are you
 - **Headless only.** Never open a visible browser window or any GUI app.
 - **No secrets in recipes**; recipes use `${ENV_VAR}`, including for one-time sign-in links.
 - **No mislabelled images.** Every image is reviewed after capture; a wrong one is repaired, or
-  removed (`screenify remove`) and skipped with the reason, never left in the library.
+  removed (`screenify remove`) and skipped with the reason, never left in the library; a wrong
+  `shows` or caption is corrected with `screenify describe`.
 - **The user's environment changes only with the user's yes.** No data, accounts, feature switches
   or settings are added or changed without it.
 - **Writes need a disposable database.** Recipes that create, edit or delete data run only after the

@@ -94,7 +94,9 @@ disposable. The app's environment (accounts, sample data, workspaces, feature sw
 belongs to the user: start the app with the repo's own scripts, but change nothing else unless the
 task says the user agreed; report what is missing as suggestions instead. In capture, open every new
 image and its sidecar afterwards: repair, or remove with "screenify remove" and skip, any image that
-does not show the item and state it is named for. Stop and report a blocker once instead of
+does not show the item and state it is named for, and correct its shows with "screenify describe".
+Write locators from the failure sidecar's accessibility outline: role and exact name, "within" to
+scope, wait for data rather than page chrome; writing flows use \${RUN_ID} in what they create. Stop and report a blocker once instead of
 retrying. Report what you did, what was skipped and why, and the environment suggestions.
 """
 `;

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { addImage, removeImage } from './add.js';
+import { addImage, describeCapture, removeImage } from './add.js';
 import { composeAdHocBoard } from './boardcmd.js';
 import { discoverChanges, headCommit, renderDiscover } from './discover.js';
 import { doctor } from './doctor.js';
@@ -41,6 +41,8 @@ Usage: screenify <command> [options]      (screenify <command> --help for one co
   run <recipe>...            Replay recipes headlessly, check each shot, file the captures
   add <png> ...              File an image captured with another tool (Flutter, simulators, desktop)
   remove <capture> --note T  Take a rejected image out of the library; its state is pending again
+  describe <capture> --shows T [--step N] [--caption C]
+                             Correct what a filed image or flow frame says, without re-running it
   board <capture|png>... --title T          Compose chosen captures into one captioned sheet
   status [--json]            Stale captures, and plan items with states not yet captured
   refresh [--all]            Replay recipes of stale captures (all with --all); exit 1 on failures
@@ -69,6 +71,11 @@ const COMMAND_HELP: Record<string, string> = {
   Deletes the capture's image (a flow's boards and frames), sidecar and manifest entry, only inside
   the library's screens/ and flows/ folders. Its plan item loses it, so the state shows as pending
   again, and the reason is kept as the item's capture note.`,
+  describe: `screenify describe <capture id or path> --shows "what it shows" [--step N] [--caption "…"] [--json]
+  Corrects a filed capture without re-running it: a screen's shows, or one flow frame's shows and
+  caption (--step N is required for a flow). Updates the sidecar, manifest and INDEX.md; a caption
+  change recomposes the flow's frames and boards from the stored images. Change the recipe too, or
+  the next refresh brings the old text back.`,
   run: `screenify run <recipe>... [--base-url URL] [--allow-writes] [--keep-passing] [--json]
   Replays recipes headlessly. Each shot must land on its expected URL, pass its "expect" text checks
   and differ from the other images, or the recipe fails with the page-at-failure in .failures/.
@@ -428,6 +435,19 @@ async function command(cmd: string, rest: string[], store: Store): Promise<numbe
       else print(`removed ${r.id}${r.planItem ? `; ${r.planItem} has that state pending again` : ''}`);
       return 0;
     }
+    case 'describe': {
+      const { values, positionals } = parse(rest, { step: { type: 'string' }, shows: { type: 'string' }, caption: { type: 'string' } });
+      if (!positionals[0]) throw new Error('give the capture id or path to describe (from INDEX.md)');
+      const step = values.step === undefined ? undefined : Number(values.step);
+      if (step !== undefined && !Number.isInteger(step)) throw new Error('--step must be a frame number');
+      const c = await describeCapture(store, positionals[0], { step, shows: values.shows as string | undefined, caption: values.caption as string | undefined });
+      if (values.json) print(JSON.stringify({ described: c.id }));
+      else {
+        print(`described ${c.id}`);
+        if (c.recipe) print(`update the recipe too (screenify-out/${c.recipe}); the next refresh replays it and would bring the old text back`);
+      }
+      return 0;
+    }
     case 'board': {
       const { values, positionals } = parse(rest, { title: { type: 'string' } });
       if (!values.title) throw new Error('--title is required');
@@ -512,6 +532,12 @@ export async function main(argv: string[], cliIo: Partial<CliIo> = {}): Promise<
     return r.linkNote ? 1 : 0;
   }
 
+  const resolved = resolveStore(io.cwd, io.env);
+  if (!resolved.shared && !existsSync(resolved.dir)) {
+    throw new Error(
+      `${resolved.repoRoot} is not inside a git repository and has no screenify-out folder. Run screenify from your repository, or run "screenify init" here to keep a library in a plain screenify-out folder.`,
+    );
+  }
   const { store, changes } = openStore(io.cwd, io.env);
   if (changes.link === 'repaired' || changes.link === 'created') notice(`(linked ${store.link} → ${store.dir})`);
   if (changes.note) notice(`warning: ${changes.note}`);

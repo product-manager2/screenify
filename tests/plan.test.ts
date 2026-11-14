@@ -188,3 +188,24 @@ describe('capture-side fields and writing states', () => {
     expect(() => parsePlanImport([{ ...list, states: [{ name: 'x', how: 'y', writes: 'yes' }] }])).toThrow(/states\[0\] "writes" must be true or false/);
   });
 });
+
+describe('unknown keys', () => {
+  const reject = (raw: unknown) => {
+    try {
+      parsePlanImport([raw]);
+    } catch (err) {
+      return (err as Error).message;
+    }
+    return '';
+  };
+  it('names a misplaced key and where it belongs', () => {
+    expect(reject({ ...list, states: [{ name: 'empty', how: 'No tasks', auth: 'member' }] })).toContain('states[0] has unknown key "auth"; it belongs on the item');
+    expect(reject({ ...list, how: 'Open it' })).toContain('unknown key "how"; it belongs on a state');
+    expect(reject({ ...list, writes: true })).toContain('"writes" on a screen belongs on the state that changes data or settings');
+    expect(reject({ ...list, colour: 'blue' })).toMatch(/unknown key "colour"; an item takes kind, platform, feature, name/);
+    expect(reject({ ...list, states: [{ name: 'empty', how: 'x', color: 1 }] })).toContain('states[0] has unknown key "color"; a state takes name, how, writes');
+  });
+  it('accepts and ignores the capture-side fields plan show --json prints', () => {
+    expect(reject({ ...list, id: 'screen:web:tasks:task-list', status: 'captured', captures: [], skippedStates: {}, captureNote: 'x', coverage: {} })).toBe('');
+  });
+});

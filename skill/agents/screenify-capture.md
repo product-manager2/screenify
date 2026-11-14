@@ -89,12 +89,22 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
    reaching each state the way its `how` line says. Before each shot, `waitFor` something that only
    that state shows. For a state with data ("filled", a detail page), wait for an actual data row or
    item, never the page heading or chrome, and add an `expect` with that row's text, so a shot of
-   loading skeletons fails instead of being filed. Prefer exact names in locators
-   (`{"role": "button", "name": "Filters", "exact": true}`): without `exact`, "Filters" also matches
-   "Open filters". Open the item's `example` path. Then `npx screenify run <recipe>…`.
+   loading skeletons fails instead of being filed. Write locators as the guide below says. Open the
+   item's `example` path. If the route redirects (a landing check fails with "add "expectUrl": …
+   if this redirect is expected"), add that `expectUrl` to the shot, with named params. Then
+   `npx screenify run <recipe>…`.
 4. **Then flows.** For each pending flow item, write a flow recipe following its `steps` outline
    with 4 to 6 shots: the starting screen, each meaningful step, and the result. Every flow shot
    has a `caption` naming the step just taken.
+   - **Prove a save landed** by waiting for the new item where saved items appear, scoped with
+     `within`: `{"waitFor": {"text": "Note ${RUN_ID}", "within": {"role": "region", "name": "Feed"}}}`,
+     and an `expect` with the same text. Text waits and `expect` ignore what is typed into editable
+     regions (a rich-text composer), so the typed text alone never passes.
+   - **Writing flows run more than once.** Put `${RUN_ID}` in the values they create ("Note
+     ${RUN_ID}"): every run gets its own short id, so a run never trips over data an earlier failed
+     run left behind. Clean up in the recipe itself: after the last shot, delete what the flow
+     created through the app's own UI. Screenify never deletes app data; leftovers from a failed run
+     carry their run id, so they are easy to find and remove.
 5. **Review every new image (required).** For each capture `run` filed, open the image and its `.md`
    sidecar and answer:
    - Does it show the plan item and the state it is named for?
@@ -107,14 +117,33 @@ Run the CLI as `npx screenify <command>` from the repository root. Add `--json` 
    - Is anything covering what matters: a toast, an error, a dev badge, a cookie banner, a chat or
      assistant bubble, a floating bar? Add it to `hide` (below).
    - Is a long screen cut off because the page scrolls an inner panel? Then add `scrollContainer`.
-   Then rewrite the shot's `shows` to say what the image actually shows ("Goals list with three goals,
+   Then correct the shot's `shows` to say what the image actually shows ("Goals list with three goals,
    one at risk"); never a placeholder such as the screen and state names, which the CLI rejects.
+   Change it in the recipe (so refresh keeps it) and on the filed image without re-running:
+   `npx screenify describe <capture id> --shows "…"`, or for a flow frame
+   `npx screenify describe <flow id> --step 2 --caption "Click Save" --shows "…"` (the board is
+   recomposed from the stored frames).
    If the image is wrong, take it out (`npx screenify remove <capture id> --note "loading
    skeletons, not data"`; its state shows as pending again), repair the recipe (a better `waitFor`,
    an `expect`, `exact`, `scrollContainer`, a `hide` selector) and run it again. If it is wrong
    because of the environment (no data, a feature not available, the wrong workspace), skip the
    state with the reason and add the gap to your suggestions. Add an `expect` for what you checked
    by eye so the next refresh catches the same mistake without you.
+**Writing locators that work the first time.** Most capture time goes on repairs; these habits avoid
+most of them:
+- **Read before you write.** After a failure, open the failure sidecar's accessibility outline
+  first: it lists every role and name on the page as the browser sees it. Copy names from there,
+  not from the source code (labels are often translated, trimmed or rendered differently).
+- **Role and exact name first:** `{"role": "button", "name": "Save", "exact": true}`. Without
+  `exact`, "Save" also matches "Save as draft". Use text or label next, a test id or CSS last.
+- **Scope with `within`** when a name appears twice (a "Delete" in every row, a title in both the
+  editor and the list): `{"role": "button", "name": "Delete", "exact": true, "within": {"role":
+  "listitem", "name": "Quarterly report"}}`.
+- **Wait for data, not chrome.** The heading and navigation render before the data; wait for a row,
+  card or item of the state you want.
+- **A URL wait matches the whole path:** `{"waitFor": {"url": "/calendar/:year/:month"}}`, with the
+  same named params and `*` as `expectUrl`.
+
 6. **Repair failures.** A failed run prints the step that failed and a page-at-failure image under
    `screenify-out/.failures/` with a `.md` beside it: the error, the final URL ("page is on /x
    (expected /y)" when a redirect moved it), alert text, and the page's accessibility outline, where
@@ -211,11 +240,15 @@ when you do not know which theme the image shows; it is then filed as `app-defau
 - Readiness is explicit: put a `waitFor` on something the state shows before every `shot`. The CLI
   waits only for fonts, never for a network-idle guess; `doctor` warns about shots without one.
 - Steps: `goto`, `click`, `fill` + `value`, `press` (+ optional `on`), `select` + `value`, `hover`,
-  `waitFor` (a locator, `{"url": "/path"}` or `{"text": "…"}`), `wait` (milliseconds; avoid),
-  `shot`.
+  `waitFor` (a locator, `{"url": "/path/:param"}` matched against the whole path, or
+  `{"text": "…"}`), `wait` (milliseconds; avoid), `shot`.
+- `${RUN_ID}` in values, locator names and text, and `expect` is replaced by a short id unique to
+  the run (not a secret, not scrubbed); `${OTHER}` reads the environment.
 - Locators, in order of preference: `{"role": "button", "name": "Save"}`, `{"text": "…"}`,
   `{"label": "Email"}`, `{"testId": "…"}`, `{"css": "…"}`. Names and text match as substrings unless
-  `"exact": true` (role, text and label locators); prefer exact names. Add `"nth": 0` when several
+  `"exact": true` (role, text and label locators); prefer exact names. `"within": <locator>` searches
+  inside another element. A text locator in `waitFor` skips editable regions (composers) unless
+  `"ignoreFields": false`; input and textarea values never match text. Add `"nth": 0` when several
   match.
 - `viewports`: `desktop` (1440x900), `laptop` (1280x800), `tablet` (820x1180), `mobile` (390x844),
   all at device scale 1, or `{"name": "…", "width": …, "height": …, "deviceScaleFactor": 2}` (a scale
