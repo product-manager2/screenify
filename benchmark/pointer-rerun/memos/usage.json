@@ -187,5 +187,267 @@
   "cache_read": 1291641,
   "cache_write": 70247,
   "ok": true
+ },
+ "sonnet-browse-1": {
+  "cost_usd_list_price": 0.2734,
+  "seconds": 67,
+  "turns": 26,
+  "tool_calls": 25,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 30,
+  "output_tokens": 8406,
+  "cache_read": 411893,
+  "cache_write": 37035,
+  "ok": true
+ },
+ "sonnet-browse-2": {
+  "cost_usd_list_price": 0.282,
+  "seconds": 73,
+  "turns": 26,
+  "tool_calls": 25,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 26,
+  "output_tokens": 9705,
+  "cache_read": 338927,
+  "cache_write": 37754,
+  "ok": true
+ },
+ "sonnet-browse-3": {
+  "cost_usd_list_price": 0.2898,
+  "seconds": 74,
+  "turns": 29,
+  "tool_calls": 28,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 26,
+  "output_tokens": 8970,
+  "cache_read": 391708,
+  "cache_write": 40211,
+  "ok": true
+ },
+ "sonnet-code-1": {
+  "cost_usd_list_price": 0.2912,
+  "seconds": 75,
+  "turns": 32,
+  "tool_calls": 31,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 22,
+  "output_tokens": 8982,
+  "cache_read": 311381,
+  "cache_write": 42550,
+  "ok": true
+ },
+ "sonnet-code-2": {
+  "cost_usd_list_price": 0.2982,
+  "seconds": 76,
+  "turns": 35,
+  "tool_calls": 34,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 26,
+  "output_tokens": 9627,
+  "cache_read": 364290,
+  "cache_write": 41352,
+  "ok": true
+ },
+ "sonnet-code-3": {
+  "cost_usd_list_price": 0.2614,
+  "seconds": 62,
+  "turns": 28,
+  "tool_calls": 27,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 20,
+  "output_tokens": 7428,
+  "cache_read": 259172,
+  "cache_write": 40286,
+  "ok": true
+ },
+ "sonnet-lib-1": {
+  "cost_usd_list_price": 0.3067,
+  "seconds": 66,
+  "turns": 30,
+  "tool_calls": 29,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 2,
+   "index_opened": 0,
+   "searches_or_listings": 1,
+   "before_first_edit": true,
+   "images": []
+  },
+  "input_tokens": 22,
+  "output_tokens": 7969,
+  "cache_read": 358743,
+  "cache_write": 47781,
+  "ok": true
+ },
+ "sonnet-lib-2": {
+  "cost_usd_list_price": 0.3621,
+  "seconds": 74,
+  "turns": 35,
+  "tool_calls": 34,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 1,
+   "sidecars_opened": 2,
+   "index_opened": 0,
+   "searches_or_listings": 1,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/memos/memo-card-menu/memo-card-menu--copy-submenu--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 26,
+  "output_tokens": 9735,
+  "cache_read": 453893,
+  "cache_write": 54815,
+  "ok": true
+ },
+ "sonnet-lib-3": {
+  "cost_usd_list_price": 0.3941,
+  "seconds": 85,
+  "turns": 41,
+  "tool_calls": 40,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 2,
+   "sidecars_opened": 2,
+   "index_opened": 0,
+   "searches_or_listings": 1,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/memos/memo-card-menu/memo-card-menu--menu-open--desktop-1440x900--app-default.png",
+    "screens/web/memos/memo-card-menu/memo-card-menu--copy-submenu--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 32,
+  "output_tokens": 10532,
+  "cache_read": 616052,
+  "cache_write": 56768,
+  "ok": true
+ },
+ "memos-img-1": {
+  "cost_usd_list_price": 0.0454,
+  "seconds": 131,
+  "turns": 57,
+  "tool_calls": 56,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 1,
+   "sidecars_opened": 1,
+   "index_opened": 1,
+   "searches_or_listings": 2,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/memos/memo-card-menu/memo-card-menu--menu-open--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 56,
+  "output_tokens": 22850,
+  "cache_read": 1655948,
+  "cache_write": 87167,
+  "ok": true
+ },
+ "memos-img-2": {
+  "cost_usd_list_price": 0.0366,
+  "seconds": 128,
+  "turns": 55,
+  "tool_calls": 54,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 2,
+   "before_first_edit": true,
+   "images": []
+  },
+  "input_tokens": 54,
+  "output_tokens": 19358,
+  "cache_read": 1261255,
+  "cache_write": 71384,
+  "ok": true
+ },
+ "memos-img-3": {
+  "cost_usd_list_price": 0.036,
+  "seconds": 113,
+  "turns": 46,
+  "tool_calls": 45,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 2,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 1,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/memos/memo-card-menu/memo-card-menu--menu-open--desktop-1440x900--app-default.png",
+    "screens/web/memos/memo-card-menu/memo-card-menu--copy-submenu--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 40,
+  "output_tokens": 18828,
+  "cache_read": 1035681,
+  "cache_write": 80968,
+  "ok": true
  }
 }

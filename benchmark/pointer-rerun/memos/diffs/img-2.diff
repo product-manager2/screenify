@@ -1,0 +1,204 @@
+diff --git a/web/src/components/MemoActionMenu/MemoActionMenu.tsx b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+index 035647c..a7ae7d5 100644
+--- a/web/src/components/MemoActionMenu/MemoActionMenu.tsx
++++ b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+@@ -6,6 +6,7 @@ import {
+   BookmarkPlusIcon,
+   CheckCheckIcon,
+   CopyIcon,
++  CopyPlusIcon,
+   Edit3Icon,
+   FileTextIcon,
+   LinkIcon,
+@@ -37,7 +38,7 @@ import type { MemoActionMenuProps } from "./types";
+ /**
+  * The memo's action menu, grouped by what each action does to the card:
+  * write on it (Edit, the task action), place it (Pin, Archive), reach it beyond
+- * the feed (Open its page, Copy its link or content), then Delete last.
++ * the feed (Open its page, Copy its link or content, Duplicate), then Delete last.
+  * A memo's Space is changed in the editor, not here. An archived memo offers
+  * only Restore and Delete, and a viewer only Open and Copy.
+  */
+@@ -62,6 +63,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemoClick,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+@@ -105,6 +107,14 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+     </DropdownMenuSub>
+   );
+ 
++  // A comment is a reply under its parent, so only top-level memos can be duplicated.
++  const duplicateItem = !isComment && (
++    <DropdownMenuItem onClick={handleDuplicateMemoClick}>
++      <CopyPlusIcon />
++      {t("memo.duplicate")}
++    </DropdownMenuItem>
++  );
++
+   const deleteItem = (
+     <DropdownMenuItem variant="destructive" onClick={handleDeleteMemoClick}>
+       <TrashIcon />
+@@ -173,6 +183,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+         <DropdownMenuSeparator />
+         {openItem}
+         {copySubmenu}
++        {duplicateItem}
+ 
+         <DropdownMenuSeparator />
+         {deleteItem}
+diff --git a/web/src/components/MemoActionMenu/hooks.ts b/web/src/components/MemoActionMenu/hooks.ts
+index 38344a6..55fdb41 100644
+--- a/web/src/components/MemoActionMenu/hooks.ts
++++ b/web/src/components/MemoActionMenu/hooks.ts
+@@ -1,10 +1,11 @@
++import { create } from "@bufbuild/protobuf";
+ import { useQueryClient } from "@tanstack/react-query";
+ import copy from "copy-to-clipboard";
+ import { useCallback } from "react";
+ import toast from "react-hot-toast";
+ import { useLocation } from "react-router-dom";
+ import { useInstance } from "@/contexts/InstanceContext";
+-import { memoKeys, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
++import { memoKeys, useCreateMemo, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
+ import useNavigateTo from "@/hooks/useNavigateTo";
+ import { userKeys } from "@/hooks/useUserQueries";
+ import { handleError } from "@/lib/error";
+@@ -12,6 +13,7 @@ import { extractMemoIdFromName } from "@/lib/resource-names";
+ import { ROUTES } from "@/router/routes";
+ import { State } from "@/types/proto/api/common_pb";
+ import type { Memo } from "@/types/proto/api/memo_service_pb";
++import { MemoSchema } from "@/types/proto/api/memo_service_pb";
+ import { useTranslate } from "@/utils/i18n";
+ import { checkAllTasks, uncheckAllTasks } from "@/utils/markdown-task-actions";
+ import { isMemoDetailPath } from "../MemoView/navigation";
+@@ -31,6 +33,7 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+   const { profile } = useInstance();
+   const { mutateAsync: updateMemo } = useUpdateMemo();
+   const { mutateAsync: deleteMemo } = useDeleteMemo();
++  const { mutateAsync: createMemo } = useCreateMemo();
+   const isInMemoDetailPage = isMemoDetailPath(location.pathname, memo.name);
+ 
+   const memoUpdatedCallback = useCallback(() => {
+@@ -125,6 +128,23 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     toast.success(t("message.succeed-copy-content"));
+   }, [memo.content, t]);
+ 
++  // A duplicate is a new top-level memo with the same content, visibility and Space; it is not linked to the original.
++  const handleDuplicateMemoClick = useCallback(async () => {
++    try {
++      await createMemo({
++        memo: create(MemoSchema, {
++          content: memo.content,
++          visibility: memo.visibility,
++          space: memo.space,
++        }),
++      });
++    } catch (error: unknown) {
++      handleError(error, toast.error, { context: "Duplicate memo", fallbackMessage: "An error occurred" });
++      return;
++    }
++    toast.success(t("message.succeed-duplicate-memo"));
++  }, [memo.content, memo.visibility, memo.space, t, createMemo]);
++
+   const handleCheckAllTaskListItemsClick = useCallback(async () => {
+     await updateMemoContent(checkAllTasks(memo.content), "Check memo task list items");
+   }, [memo.content, updateMemoContent]);
+@@ -162,6 +182,7 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemoClick,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+diff --git a/web/src/components/MemoView/MemoViewContext.tsx b/web/src/components/MemoView/MemoViewContext.tsx
+index 250c89d..26fb2af 100644
+--- a/web/src/components/MemoView/MemoViewContext.tsx
++++ b/web/src/components/MemoView/MemoViewContext.tsx
+@@ -53,8 +53,8 @@ export const useMemoViewDerived = () => {
+   const createTime = memo.createTime ? timestampDate(memo.createTime) : undefined;
+   const updateTime = memo.updateTime ? timestampDate(memo.updateTime) : undefined;
+   const displayTime = timeBasis === "update_time" ? updateTime : createTime;
+-  const isDisplayingUpdatedTime =
+-    timeBasis === "update_time" && !!createTime && !!updateTime && updateTime.getTime() !== createTime.getTime();
++  const isEdited = !!createTime && !!updateTime && updateTime.getTime() !== createTime.getTime();
++  const isDisplayingUpdatedTime = timeBasis === "update_time" && isEdited;
+   const relativeTimeFormat: "datetime" | "auto" =
+     displayTime && Date.now() - displayTime.getTime() > RELATIVE_TIME_THRESHOLD_MS ? "datetime" : "auto";
+ 
+@@ -67,6 +67,7 @@ export const useMemoViewDerived = () => {
+     updateTime,
+     displayTime,
+     isDisplayingUpdatedTime,
++    isEdited,
+     relativeTimeFormat,
+   };
+ };
+diff --git a/web/src/components/MemoView/components/MemoHeader.tsx b/web/src/components/MemoView/components/MemoHeader.tsx
+index a4b73fb..dd0dc7d 100644
+--- a/web/src/components/MemoView/components/MemoHeader.tsx
++++ b/web/src/components/MemoView/components/MemoHeader.tsx
+@@ -29,7 +29,14 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+ 
+   const { memo, creator, currentUser, parentPage, isArchived, readonly, isEditing, openEditor } = useMemoViewContext();
+   const location = useLocation();
+-  const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, relativeTimeFormat } = useMemoViewDerived();
++  const {
++    createTime,
++    updateTime,
++    displayTime: memoDisplayTime,
++    isDisplayingUpdatedTime,
++    isEdited,
++    relativeTimeFormat,
++  } = useMemoViewDerived();
+   const { newMemoName } = useNewMemo();
+   const visibilityOption = getVisibilityOption(memo.visibility);
+ 
+@@ -89,6 +96,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+             parentPage={parentPage}
+             isCurrentPage={isMemoDetailPath(location.pathname, memo.name)}
+           />
++          {isEdited && <EditedBadge />}
+           {spaceMetadata}
+         </div>
+         {isNew && <NewBadge />}
+@@ -126,6 +134,14 @@ const NewBadge = () => {
+   );
+ };
+ 
++/** A quiet mark after the time for a memo changed since it was created; its tooltip gives the update time. */
++const EditedBadge = () => {
++  const t = useTranslate();
++  return (
++    <span className="shrink-0 whitespace-nowrap text-2xs leading-none text-muted-foreground select-none">{t("memo.edited")}</span>
++  );
++};
++
+ /**
+  * The author on one line with the time: a 20px avatar in a 20px slot, then the name in
+  * medium 13px foreground ink. It is the identity, so it carries the weight; the time after
+diff --git a/web/src/locales/en.json b/web/src/locales/en.json
+index 9e9eeca..c4fad60 100644
+--- a/web/src/locales/en.json
++++ b/web/src/locales/en.json
+@@ -392,6 +392,8 @@
+     "delete-confirm": "Are you sure you want to delete this memo?",
+     "delete-confirm-description": "This action is irreversible. Attachments, links, and references will also be removed.",
+     "direction": "Direction",
++    "duplicate": "Duplicate",
++    "edited": "Edited",
+     "filters": {
+       "has-attachments": "hasAttachments",
+       "has-code": "hasCode",
+@@ -477,6 +479,7 @@
+     "restored-successfully": "Restored successfully",
+     "succeed-copy-content": "Content copied successfully.",
+     "succeed-copy-link": "Link copied successfully.",
++    "succeed-duplicate-memo": "Memo duplicated successfully.",
+     "update-succeed": "Update succeeded"
+   },
+   "reference": {

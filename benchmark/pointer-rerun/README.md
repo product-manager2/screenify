@@ -72,15 +72,74 @@ its runs never got past the app's sign-up flow in its browser.
 The code-only run wrote "People 5"; the library run wrote "People · 5", matching the separator the
 view picker uses below it; the browse run left the title alone because the count is already there.
 
+## Round 2: Sonnet 5.5 as the coding model, and the image wording
+
+Haiku is the model Screenify runs capture on, not the model people code with. Round 2 repeats the
+same tasks with Claude Sonnet 5.5 at effort medium as the coding model, on the same three arms
+(code only, code + library with the new pointer, browse it yourself). It also adds three Haiku runs
+per app with the newer wording that sends agents to the `.png` itself when a change is about looks,
+an edge state or a flow step. All twelve runs per app were graded in one new blind pass. Those
+twelve runs are not regraded alongside the round 1 runs, so compare round 2 totals with each other
+before comparing them with round 1.
+
+### Sonnet 5.5, effort medium
+
+| | Code only | Code + Screenify | Browse it yourself |
+| --- | --- | --- | --- |
+| Memos score (3 runs × 17) | **50 / 51** | 49 / 51 | **50 / 51** |
+| Memos per run | 17, 16, 17 | 15, 17, 17 | 16, 17, 17 |
+| Memos cost / time per run | **$0.28** / 71 s | $0.35 / 75 s | **$0.28** / 71 s |
+| Twenty score (3 runs × 16) | **47 / 48** | **47 / 48** | **47 / 48** |
+| Twenty per run | 16, 16, 15 | 16, 15, 16 | 16, 15, 16 |
+| Twenty cost / time per run | **$0.38** / 82 s | $0.48 / 102 s | $0.81 / 411 s |
+| Library opened before the first edit | — | 6 / 6 runs | — |
+| Screenshots opened (runs that opened any) | — | 3 / 6 | — |
+
+**With Sonnet the library made no difference to the score on either app.** It cost about a quarter
+more per run because of the extra reading. Sonnet code-only runs did what Haiku code-only runs did
+not: on Twenty all three extended the shared copy-button hook. None built its own button or broke
+the type check. The only points lost in any arm were these:
+
+- **A second count query:** one code-only run and one library run added their own count query
+  instead of reusing the existing count.
+- **A count badge:** one browse run drew the count as a grey badge.
+- **Memos label size:** the "edited" label came out smaller than the time beside it. One library
+  run did this, and it had opened only text descriptions.
+- **Unrelated formatting:** a stray formatting change (two runs).
+
+On Memos the three browse runs never opened the running app; they worked from the code alone. On
+Twenty they did use it, and that is where their extra time and cost came from.
+
+Memos tests ([`memos/tests.json`](memos/tests.json), `sonnet55-medium-*`): every run fails 55 to
+59 tests. These are the 45 untranslated-locale tests plus menu tests the runs did not update, about
+the same in every arm.
+
+### Haiku 5.5 with the image wording
+
+| | Memos (× 17) | Twenty (× 16) |
+| --- | --- | --- |
+| Score, 3 runs | 46 / 51 (15, 15, 16) | 47 / 48 (15, 16, 16) |
+| Runs that opened a screenshot | 2 / 3 | 2 / 3 |
+| Cost / time per run | $0.04 / 124 s | $0.22 / 203 s |
+
+The new wording got Haiku to open images: 4 of 6 runs did, against 1 of 6 before. It did not fix
+the problem it was meant to fix. All three Memos runs still drew the "edited" label smaller than
+the time beside it. The two that opened screenshots opened the memo card's open menu, the screen
+for the menu task, and not one taken for the label's place beside the time. They opened the image
+the task named, not the one the label needed.
+
 ## What this says for Screenify
 
-- **The pointer fix works.** With the new wording, 6 of 6 library runs across both apps opened the
-  index before editing; with the old wording, 0 of 3 did.
-- **Agents read the text, not the pictures.** Only 1 of 6 opened an image. For questions of *what
-  exists* (a command, a count, a button) the text descriptions were enough. For questions of *how
-  it looks* (size, weight, colour) they are not, and that is where Memos lost points in every arm.
-  A follow-up change to the instructions should send agents to the image itself when the change is
-  about looks.
+- **The pointer fix works.** With the new wording, every library run on every model (12 of 12)
+  opened the library before editing; with the old wording, 0 of 3 did.
+- **On build-on-it tasks, the library is a tie for Sonnet** and a possible help for Haiku on a large
+  app (round 1 Twenty, three runs per arm). It never lowered the score by more than one point and it
+  costs a little more per run. The clear wins remain the question-answering test (Test 1), where it
+  was both more accurate and cheaper.
+- **Telling agents to open images changes how often they open them, not what they build.** In these
+  runs they opened the screen their task named, not the one showing where the new piece sits. Matching
+  size or weight also takes comparing the result with the image, which a run that cannot render its
+  change does not do. The library does not solve that on its own.
 
 ## Method
 
@@ -134,3 +193,7 @@ view picker uses below it; the browse run left the title alone because the count
   `memos/tests.json` is the Memos test suite on every run, including the Sonnet runs of the
   earlier test.
 - `side-by-side/`: the images above, plus Memos' menu and detail views across the three arms.
+- Round 2: `*/diffs/sonnet/`, `*/replies/sonnet/`, `*/screens/sonnet/` (Sonnet runs) and
+  `img-*` (Haiku image-wording runs); grades in `*/grades-round2.json`; usage in the same
+  `usage.json` files under `sonnet-*` and `*-img-*`. The Sonnet runs used the same headless
+  sessions with `--model sonnet --effort medium`.

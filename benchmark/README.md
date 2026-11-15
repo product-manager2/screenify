@@ -105,6 +105,11 @@ opened a screenshot. Memos was a tie (code only 47/51, old pointer 49/51, new po
 on Twenty the library arm scored 48/48, browsing the app 47/48 at twice the cost, and code only
 42/48. Three runs per arm; details, caveats and every run in [`pointer-rerun/`](pointer-rerun/).
 
+A second round repeated it with Sonnet 5.5 (effort medium) as the coding model: all three arms tied
+on both apps (Memos 50, 49 and 50 of 51; Twenty 47 of 48 each), with the library costing about a
+quarter more per run. Wording that tells agents to open the image got Haiku to open screenshots in
+4 of 6 runs, but did not change what it built.
+
 ## Method
 
 - **App.** Memos v26.11.0 (MIT), started with

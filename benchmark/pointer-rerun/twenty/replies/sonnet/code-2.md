@@ -1,0 +1,9 @@
+I changed requests 2 and 3. I did nothing for request 1 because the feature already exists. I couldn't build, typecheck or run tests here, so none of this has been run.
+
+1. **Export to CSV:** No change. The export command (`ExportRecordsCommand.tsx`) is already in the People list's command menu. When rows are selected, it exports only those rows as CSV through `useRecordIndexExportRecords` and `csvDownloader`. The menu entries come from the server, which I can't change. If the user can't see the action, check the workspace's command menu items rather than the front-end code.
+
+2. **Copy an address:** In `useGetSecondaryFieldButton.ts` I added an address case. Address cells now get the same hover copy button as emails, phones and links, in the companies table and on the company page. It copies the address as displayed, so it respects the field's sub-field settings. I added a toast message, "Address copied to clipboard". I didn't regenerate the translation catalogs, as the repo says to leave those to the i18n pipeline.
+
+3. **Record count:** I added `RecordIndexPageHeaderTotalCount.tsx`, which uses the existing `useGetRecordIndexTotalCount` hook, so the count follows the active filters. `RecordIndexPageHeaderTitle.tsx` shows it in muted text after the title, for example "People 1,234". It's hidden while rows are selected, because the "N selected" text takes its place. `RecordIndexPageHeader.tsx` only turns it on when the user has read permission and a view is loaded. I made the new prop optional so the AI inbox and core-object pages that reuse the title are unchanged.
+
+I didn't add tests or stories for the new pieces.

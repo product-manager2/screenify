@@ -171,6 +171,96 @@
    "passed": 1616,
    "failed": 0,
    "failed_by_file": {}
+  },
+  "sonnet55-medium-browse-1": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-browse-2": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-browse-3": {
+   "passed": 1557,
+   "failed": 59,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 6,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-code-1": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-code-2": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-code-3": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-lib-1": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-lib-2": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet55-medium-lib-3": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
   }
  }
 }
