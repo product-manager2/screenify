@@ -1,0 +1,647 @@
+diff --git a/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx b/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx
+index 83f57691..c0e63ab5 100644
+--- a/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx
++++ b/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx
+@@ -438,6 +438,12 @@ const SettingsAiPrompts = lazy(() =>
+   })),
+ );
+ 
++const SettingsWorkspaceUsage = lazy(() =>
++  import('~/pages/settings/usage/SettingsWorkspaceUsage').then((module) => ({
++    default: module.SettingsWorkspaceUsage,
++  })),
++);
++
+ const SettingsWorkspaceMembers = lazy(() =>
+   import('~/pages/settings/members/SettingsWorkspaceMembers').then(
+     (module) => ({
+@@ -1067,6 +1073,10 @@ const createSettingsRouteElements = ({
+         />
+       }
+     >
++      <Route
++        path={SettingsPath.WorkspaceUsage}
++        element={<SettingsWorkspaceUsage />}
++      />
+       <Route
+         path={SettingsPath.Objects}
+         element={<SettingsObjects />}
+diff --git a/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx b/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx
+index 36348f3c..871e3066 100644
+--- a/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx
++++ b/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx
+@@ -78,6 +78,12 @@ const MobileHomePage = lazy(() =>
+   })),
+ );
+ 
++const MyWorkPage = lazy(() =>
++  import('~/pages/my-work/MyWorkPage').then((module) => ({
++    default: module.MyWorkPage,
++  })),
++);
++
+ const NotFound = lazy(() =>
+   import('~/pages/not-found/NotFound').then((module) => ({
+     default: module.NotFound,
+@@ -215,6 +221,14 @@ export const createWorkspaceRouteObjects = ({
+         </LazyRoute>
+       ),
+     },
++    {
++      path: AppPath.MyWork,
++      element: (
++        <LazyRoute>
++          <MyWorkPage />
++        </LazyRoute>
++      ),
++    },
+     {
+       path: SETTINGS_ROOT_PATH,
+       element: <SettingsRouteOutlet />,
+diff --git a/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx b/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx
+index a987aea8..cea5abcb 100644
+--- a/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx
++++ b/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx
+@@ -1,6 +1,7 @@
+ import { GettingStartedOpenedSection } from '@/getting-started/components/GettingStartedOpenedSection';
+ import { NavigationDrawerOpenedSection } from '@/navigation-menu-item/display/sections/components/NavigationDrawerOpenedSection';
+ import { NavigationDrawerWorkspaceSectionSkeletonLoader } from '@/object-metadata/components/NavigationDrawerWorkspaceSectionSkeletonLoader';
++import { MyWorkNavigationDrawerItem } from '@/my-work/components/MyWorkNavigationDrawerItem';
+ 
+ import { styled } from '@linaria/react';
+ import { lazy, Suspense } from 'react';
+@@ -32,6 +33,7 @@ const StyledScrollableItemsContainer = styled.div`
+ export const MainNavigationDrawerScrollableItems = () => {
+   return (
+     <StyledScrollableItemsContainer>
++      <MyWorkNavigationDrawerItem />
+       <NavigationDrawerOpenedSection />
+       <GettingStartedOpenedSection />
+       <Suspense fallback={<NavigationDrawerWorkspaceSectionSkeletonLoader />}>
+diff --git a/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx b/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx
+index 5acde8af..bc56bace 100644
+--- a/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx
++++ b/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx
+@@ -17,6 +17,7 @@ import {
+   IconApps,
+   IconAt,
+   IconCalendarEvent,
++  IconChartBar,
+   IconCode,
+   IconColorSwatch,
+   type IconComponent,
+@@ -131,6 +132,12 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
+           Icon: IconSettings2,
+           isHidden: !permissionFlagMap[PermissionFlagType.WORKSPACE],
+         },
++        {
++          label: t`Usage`,
++          path: SettingsPath.WorkspaceUsage,
++          Icon: IconChartBar,
++          isHidden: !permissionFlagMap[PermissionFlagType.DATA_MODEL],
++        },
+         {
+           label: t`Data model`,
+           path: SettingsPath.Objects,
+diff --git a/packages/twenty-shared/src/types/AppPath.ts b/packages/twenty-shared/src/types/AppPath.ts
+index a85e3474..ddbab816 100644
+--- a/packages/twenty-shared/src/types/AppPath.ts
++++ b/packages/twenty-shared/src/types/AppPath.ts
+@@ -19,6 +19,7 @@ export enum AppPath {
+   Index = '/',
+   // Mobile only: the navigation menu is a page there rather than a drawer.
+   Home = '/home',
++  MyWork = '/my-work',
+   TasksPage = '/objects/tasks',
+   OpportunitiesPage = '/objects/opportunities',
+ 
+diff --git a/packages/twenty-shared/src/types/SettingsPath.ts b/packages/twenty-shared/src/types/SettingsPath.ts
+index e5a5b43d..625f6223 100644
+--- a/packages/twenty-shared/src/types/SettingsPath.ts
++++ b/packages/twenty-shared/src/types/SettingsPath.ts
+@@ -45,6 +45,7 @@ export enum SettingsPath {
+   WorkspaceMembersPage = 'members',
+   WorkspaceMemberPage = 'members/:workspaceMemberId',
+   General = 'general',
++  WorkspaceUsage = 'usage',
+   Subdomain = 'general/subdomain',
+   CustomDomain = 'general/custom-domain',
+   WorkspaceCommunications = 'communications',
+diff --git a/packages/twenty-front/src/modules/my-work/components/MyWorkNavigationDrawerItem.tsx b/packages/twenty-front/src/modules/my-work/components/MyWorkNavigationDrawerItem.tsx
+new file mode 100644
+index 00000000..0d1db6c0
+--- /dev/null
++++ b/packages/twenty-front/src/modules/my-work/components/MyWorkNavigationDrawerItem.tsx
+@@ -0,0 +1,23 @@
++import { NavigationDrawerItem } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItem';
++import { NavigationDrawerSection } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerSection';
++import { useLingui } from '@lingui/react/macro';
++import { useMatch } from 'react-router-dom';
++import { AppPath } from 'twenty-shared/types';
++import { isDefined } from 'twenty-shared/utils';
++import { IconCheckbox } from 'twenty-ui/icon';
++
++export const MyWorkNavigationDrawerItem = () => {
++  const { t } = useLingui();
++  const isMyWorkPageOpen = isDefined(useMatch(AppPath.MyWork));
++
++  return (
++    <NavigationDrawerSection>
++      <NavigationDrawerItem
++        label={t`My work`}
++        to={AppPath.MyWork}
++        Icon={IconCheckbox}
++        active={isMyWorkPageOpen}
++      />
++    </NavigationDrawerSection>
++  );
++};
+diff --git a/packages/twenty-front/src/modules/my-work/components/MyWorkOpenTasks.tsx b/packages/twenty-front/src/modules/my-work/components/MyWorkOpenTasks.tsx
+new file mode 100644
+index 00000000..e64306e0
+--- /dev/null
++++ b/packages/twenty-front/src/modules/my-work/components/MyWorkOpenTasks.tsx
+@@ -0,0 +1,163 @@
++import { ActivityList } from '@/activities/components/ActivityList';
++import { ActivityRow } from '@/activities/components/ActivityRow';
++import { SkeletonLoader } from '@/activities/components/SkeletonLoader';
++import { useCompleteTask } from '@/activities/tasks/hooks/useCompleteTask';
++import { type Task } from '@/activities/types/Task';
++import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
++import { useFindManyRecords } from '@/object-record/hooks/useFindManyRecords';
++import { useOpenRecordInSidePanel } from '@/side-panel/hooks/useOpenRecordInSidePanel';
++import { AnimatedPlaceholder } from '@/ui/feedback/empty-state/components/AnimatedPlaceholder/AnimatedPlaceholder';
++import { EmptyState } from '@/ui/feedback/empty-state/components/EmptyState';
++import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
++import { styled } from '@linaria/react';
++import { useLingui } from '@lingui/react/macro';
++import { isNonEmptyString } from '@sniptt/guards';
++import { StandardObjectNameSingular } from 'twenty-shared/types';
++import { isDefined } from 'twenty-shared/utils';
++import { Section } from 'twenty-ui/components/layout';
++import { Callout } from 'twenty-ui/components/feedback';
++import { IconCalendar } from 'twenty-ui/icon';
++import { Checkbox } from 'twenty-ui/primitives/input';
++import { Card } from 'twenty-ui/primitives/surfaces';
++import { themeCssVariables, useTheme } from 'twenty-ui/theme';
++import { beautifyExactDate, hasDatePassed } from '~/utils/date-utils';
++
++const StyledLeftSideContainer = styled.div`
++  align-items: center;
++  display: flex;
++  flex: 1;
++  overflow: hidden;
++`;
++
++const StyledCheckboxContainer = styled.div`
++  display: flex;
++`;
++
++const StyledTaskTitle = styled.div`
++  color: ${themeCssVariables.font.color.primary};
++  font-weight: ${themeCssVariables.font.weight.medium};
++  overflow: hidden;
++  padding: 0 ${themeCssVariables.spacing[2]};
++  text-overflow: ellipsis;
++  white-space: nowrap;
++`;
++
++const StyledDueDate = styled.div<{ isPast: boolean }>`
++  align-items: center;
++  color: ${({ isPast }) =>
++    isPast
++      ? themeCssVariables.font.color.danger
++      : themeCssVariables.font.color.secondary};
++  display: flex;
++  gap: ${themeCssVariables.spacing[1]};
++  padding-left: ${themeCssVariables.spacing[1]};
++  white-space: nowrap;
++`;
++
++type MyWorkTaskRowProps = {
++  task: Task;
++  divider: boolean;
++};
++
++const MyWorkTaskRow = ({ task, divider }: MyWorkTaskRowProps) => {
++  const { t } = useLingui();
++  const theme = useTheme();
++  const { openRecordInSidePanel } = useOpenRecordInSidePanel();
++  const { completeTask } = useCompleteTask(task);
++
++  const title = isNonEmptyString(task.title) ? task.title : t`Task title`;
++
++  return (
++    <ActivityRow
++      label={title}
++      divider={divider}
++      onClick={() => {
++        openRecordInSidePanel({
++          recordId: task.id,
++          objectNameSingular: StandardObjectNameSingular.Task,
++        });
++      }}
++    >
++      <StyledLeftSideContainer>
++        <Card.Control
++          render={<StyledCheckboxContainer />}
++          onClick={(event) => event.stopPropagation()}
++        >
++          <Checkbox
++            checked={task.status === 'DONE'}
++            shape="round"
++            onCheckedChange={completeTask}
++          />
++        </Card.Control>
++        <StyledTaskTitle>{title}</StyledTaskTitle>
++      </StyledLeftSideContainer>
++      {isDefined(task.dueAt) && (
++        <StyledDueDate
++          isPast={hasDatePassed(task.dueAt) && task.status === 'TODO'}
++        >
++          <IconCalendar size={theme.icon.size.md} />
++          {beautifyExactDate(task.dueAt)}
++        </StyledDueDate>
++      )}
++    </ActivityRow>
++  );
++};
++
++export const MyWorkOpenTasks = () => {
++  const { t } = useLingui();
++  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
++
++  const {
++    records: tasks,
++    loading,
++    error,
++  } = useFindManyRecords<Task>({
++    objectNameSingular: StandardObjectNameSingular.Task,
++    filter: {
++      assigneeId: { eq: currentWorkspaceMember?.id },
++      or: [{ status: { is: 'NULL' } }, { status: { neq: 'DONE' } }],
++    },
++    orderBy: [{ dueAt: 'AscNullsLast' }],
++    skip: !isDefined(currentWorkspaceMember),
++  });
++
++  const renderContent = () => {
++    if (isDefined(error)) {
++      return <Callout status="error" title={t`Could not load your tasks.`} />;
++    }
++
++    if (loading && tasks.length === 0) {
++      return <SkeletonLoader />;
++    }
++
++    if (tasks.length === 0) {
++      return (
++        <EmptyState.Root>
++          <AnimatedPlaceholder type="noTask" />
++          <EmptyState.Content>
++            <EmptyState.Title>{t`You have no open tasks`}</EmptyState.Title>
++          </EmptyState.Content>
++        </EmptyState.Root>
++      );
++    }
++
++    return (
++      <ActivityList>
++        {tasks.map((task, index) => (
++          <MyWorkTaskRow
++            key={task.id}
++            task={task}
++            divider={index < tasks.length - 1}
++          />
++        ))}
++      </ActivityList>
++    );
++  };
++
++  return (
++    <Section.Root>
++      <Section.Header title={t`Open tasks`} />
++      {renderContent()}
++    </Section.Root>
++  );
++};
+diff --git a/packages/twenty-front/src/modules/my-work/components/MyWorkRecentPeople.tsx b/packages/twenty-front/src/modules/my-work/components/MyWorkRecentPeople.tsx
+new file mode 100644
+index 00000000..85942e6a
+--- /dev/null
++++ b/packages/twenty-front/src/modules/my-work/components/MyWorkRecentPeople.tsx
+@@ -0,0 +1,119 @@
++import { ActivityList } from '@/activities/components/ActivityList';
++import { ActivityRow } from '@/activities/components/ActivityRow';
++import { SkeletonLoader } from '@/activities/components/SkeletonLoader';
++import { type Person } from '@/people/types/Person';
++import { useFindManyRecords } from '@/object-record/hooks/useFindManyRecords';
++import { useOpenRecordInSidePanel } from '@/side-panel/hooks/useOpenRecordInSidePanel';
++import { styled } from '@linaria/react';
++import { useLingui } from '@lingui/react/macro';
++import { isNonEmptyString } from '@sniptt/guards';
++import { StandardObjectNameSingular } from 'twenty-shared/types';
++import { Section } from 'twenty-ui/components/layout';
++import { Avatar } from 'twenty-ui/primitives/data-display';
++import { themeCssVariables } from 'twenty-ui/theme';
++import { getAbsoluteImageUrl } from '~/utils/image/getAbsoluteImageUrl';
++import { beautifyPastDateRelativeToNow } from '~/utils/date-utils';
++
++const RECENT_PEOPLE_LIMIT = 5;
++
++const StyledPersonInfo = styled.div`
++  align-items: center;
++  display: flex;
++  flex: 1;
++  gap: ${themeCssVariables.spacing[2]};
++  min-width: 0;
++`;
++
++const StyledPersonName = styled.div`
++  color: ${themeCssVariables.font.color.primary};
++  font-weight: ${themeCssVariables.font.weight.medium};
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++`;
++
++const StyledCreatedAt = styled.div`
++  color: ${themeCssVariables.font.color.tertiary};
++  padding-left: ${themeCssVariables.spacing[2]};
++  white-space: nowrap;
++`;
++
++type MyWorkPersonRowProps = {
++  person: Person;
++  divider: boolean;
++};
++
++const MyWorkPersonRow = ({ person, divider }: MyWorkPersonRowProps) => {
++  const { t } = useLingui();
++  const { openRecordInSidePanel } = useOpenRecordInSidePanel();
++
++  const fullName = [person.name.firstName, person.name.lastName]
++    .filter(isNonEmptyString)
++    .join(' ');
++  const label = isNonEmptyString(fullName) ? fullName : t`Unnamed person`;
++
++  return (
++    <ActivityRow
++      label={label}
++      divider={divider}
++      onClick={() => {
++        openRecordInSidePanel({
++          recordId: person.id,
++          objectNameSingular: StandardObjectNameSingular.Person,
++        });
++      }}
++    >
++      <StyledPersonInfo>
++        <Avatar
++          src={getAbsoluteImageUrl(person.avatarUrl)}
++          colorSeed={person.id}
++          name={label}
++          shape="circle"
++          size="sm"
++        />
++        <StyledPersonName>{label}</StyledPersonName>
++      </StyledPersonInfo>
++      <StyledCreatedAt>
++        {t`Created ${beautifyPastDateRelativeToNow(person.createdAt)}`}
++      </StyledCreatedAt>
++    </ActivityRow>
++  );
++};
++
++export const MyWorkRecentPeople = () => {
++  const { t } = useLingui();
++
++  const { records: people, loading } = useFindManyRecords<Person>({
++    objectNameSingular: StandardObjectNameSingular.Person,
++    orderBy: [{ createdAt: 'DescNullsLast' }],
++    limit: RECENT_PEOPLE_LIMIT,
++  });
++
++  if (loading && people.length === 0) {
++    return (
++      <Section.Root>
++        <Section.Header title={t`Recently added people`} />
++        <SkeletonLoader />
++      </Section.Root>
++    );
++  }
++
++  if (people.length === 0) {
++    return null;
++  }
++
++  return (
++    <Section.Root>
++      <Section.Header title={t`Recently added people`} />
++      <ActivityList>
++        {people.map((person, index) => (
++          <MyWorkPersonRow
++            key={person.id}
++            person={person}
++            divider={index < people.length - 1}
++          />
++        ))}
++      </ActivityList>
++    </Section.Root>
++  );
++};
+diff --git a/packages/twenty-front/src/pages/my-work/MyWorkPage.tsx b/packages/twenty-front/src/pages/my-work/MyWorkPage.tsx
+new file mode 100644
+index 00000000..e30369be
+--- /dev/null
++++ b/packages/twenty-front/src/pages/my-work/MyWorkPage.tsx
+@@ -0,0 +1,43 @@
++import { MyWorkOpenTasks } from '@/my-work/components/MyWorkOpenTasks';
++import { MyWorkRecentPeople } from '@/my-work/components/MyWorkRecentPeople';
++import { PageCardHeader } from '@/ui/layout/page/components/PageCardHeader';
++import { PageCardLayout } from '@/ui/layout/page/components/PageCardLayout';
++import { PageTitle } from '@/ui/utilities/page-title/components/PageTitle';
++import { styled } from '@linaria/react';
++import { useLingui } from '@lingui/react/macro';
++import { IconCheckbox } from 'twenty-ui/icon';
++import { themeCssVariables, useTheme } from 'twenty-ui/theme';
++
++const StyledContent = styled.div`
++  display: flex;
++  flex: 1;
++  flex-direction: column;
++  gap: ${themeCssVariables.spacing[8]};
++  min-height: 0;
++  overflow-y: auto;
++  padding: ${themeCssVariables.spacing[4]};
++`;
++
++export const MyWorkPage = () => {
++  const { t } = useLingui();
++  const theme = useTheme();
++
++  return (
++    <>
++      <PageTitle title={t`My work`} />
++      <PageCardLayout
++        header={
++          <PageCardHeader
++            icon={<IconCheckbox size={theme.icon.size.md} />}
++            title={t`My work`}
++          />
++        }
++      >
++        <StyledContent>
++          <MyWorkOpenTasks />
++          <MyWorkRecentPeople />
++        </StyledContent>
++      </PageCardLayout>
++    </>
++  );
++};
+diff --git a/packages/twenty-front/src/pages/settings/usage/SettingsWorkspaceUsage.tsx b/packages/twenty-front/src/pages/settings/usage/SettingsWorkspaceUsage.tsx
+new file mode 100644
+index 00000000..33e2dc3a
+--- /dev/null
++++ b/packages/twenty-front/src/pages/settings/usage/SettingsWorkspaceUsage.tsx
+@@ -0,0 +1,140 @@
++import { useMemo } from 'react';
++import { useLingui } from '@lingui/react/macro';
++import { SettingsPath } from 'twenty-shared/types';
++import { getSettingsPath, isDefined } from 'twenty-shared/utils';
++import { Section } from 'twenty-ui/components/layout';
++import { IconUsers } from 'twenty-ui/icon';
++import { themeCssVariables, useTheme } from 'twenty-ui/theme';
++
++import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
++import { ObjectMetadataIcon } from '@/object-metadata/components/ObjectMetadataIcon';
++import { useFilteredObjectMetadataItems } from '@/object-metadata/hooks/useFilteredObjectMetadataItems';
++import { StandardObjectNamePlural } from '@/object-metadata/types/StandardObjectNamePlural';
++import { useCombinedGetTotalCount } from '@/object-record/multiple-objects/hooks/useCombinedGetTotalCount';
++import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
++import { SettingsPageLayout } from '@/settings/components/layout/SettingsPageLayout';
++import { Table } from '@/ui/layout/table/components/Table';
++import { TableBody } from '@/ui/layout/table/components/TableBody';
++import { TableCell } from '@/ui/layout/table/components/TableCell';
++import { TableHeader } from '@/ui/layout/table/components/TableHeader';
++import { TableRow } from '@/ui/layout/table/components/TableRow';
++import { styled } from '@linaria/react';
++
++const SETTINGS_USAGE_TABLE_GRID_TEMPLATE_COLUMNS = 'minmax(0, 1fr) 160px';
++
++const StyledNameCell = styled.div`
++  align-items: center;
++  display: flex;
++  gap: ${themeCssVariables.spacing[2]};
++  min-width: 0;
++`;
++
++export const SettingsWorkspaceUsage = () => {
++  const { t } = useLingui();
++  const theme = useTheme();
++  const { formatNumber } = useNumberFormat();
++  const { activeNonSystemObjectMetadataItems } =
++    useFilteredObjectMetadataItems();
++  const { totalCountByObjectMetadataItemNamePlural } =
++    useCombinedGetTotalCount();
++
++  const sortedObjectMetadataItems = useMemo(
++    () =>
++      [...activeNonSystemObjectMetadataItems].sort((itemA, itemB) =>
++        itemA.labelPlural.localeCompare(itemB.labelPlural),
++      ),
++    [activeNonSystemObjectMetadataItems],
++  );
++
++  const membersCount =
++    totalCountByObjectMetadataItemNamePlural[
++      StandardObjectNamePlural.WorkspaceMember
++    ];
++
++  return (
++    <SettingsPageLayout
++      title={t`Usage`}
++      links={[
++        {
++          children: t`Workspace`,
++          href: getSettingsPath(SettingsPath.General),
++        },
++        { children: t`Usage` },
++      ]}
++    >
++      <SettingsPageContainer>
++        <Section.Root>
++          <Section.Header title={t`Records`} />
++          <Table>
++            <TableRow
++              gridTemplateColumns={SETTINGS_USAGE_TABLE_GRID_TEMPLATE_COLUMNS}
++            >
++              <TableHeader>{t`Object`}</TableHeader>
++              <TableHeader align="right">{t`Count`}</TableHeader>
++            </TableRow>
++            <TableBody>
++              {sortedObjectMetadataItems.map((objectMetadataItem) => {
++                const objectCount =
++                  totalCountByObjectMetadataItemNamePlural[
++                    objectMetadataItem.namePlural
++                  ];
++
++                return (
++                  <TableRow
++                    key={objectMetadataItem.id}
++                    gridTemplateColumns={
++                      SETTINGS_USAGE_TABLE_GRID_TEMPLATE_COLUMNS
++                    }
++                  >
++                    <TableCell color={themeCssVariables.font.color.primary}>
++                      <StyledNameCell>
++                        <ObjectMetadataIcon
++                          objectMetadataItem={objectMetadataItem}
++                          size={theme.icon.size.md}
++                          stroke={theme.icon.stroke.sm}
++                        />
++                        <span>{objectMetadataItem.labelPlural}</span>
++                      </StyledNameCell>
++                    </TableCell>
++                    <TableCell
++                      align="right"
++                      color={themeCssVariables.font.color.secondary}
++                    >
++                      {isDefined(objectCount) ? formatNumber(objectCount) : ''}
++                    </TableCell>
++                  </TableRow>
++                );
++              })}
++            </TableBody>
++          </Table>
++        </Section.Root>
++        <Section.Root>
++          <Section.Header title={t`Members`} />
++          <Table>
++            <TableBody>
++              <TableRow
++                gridTemplateColumns={SETTINGS_USAGE_TABLE_GRID_TEMPLATE_COLUMNS}
++              >
++                <TableCell color={themeCssVariables.font.color.primary}>
++                  <StyledNameCell>
++                    <IconUsers
++                      size={theme.icon.size.md}
++                      stroke={theme.icon.stroke.sm}
++                    />
++                    <span>{t`Workspace members`}</span>
++                  </StyledNameCell>
++                </TableCell>
++                <TableCell
++                  align="right"
++                  color={themeCssVariables.font.color.secondary}
++                >
++                  {isDefined(membersCount) ? formatNumber(membersCount) : ''}
++                </TableCell>
++              </TableRow>
++            </TableBody>
++          </Table>
++        </Section.Root>
++      </SettingsPageContainer>
++    </SettingsPageLayout>
++  );
++};

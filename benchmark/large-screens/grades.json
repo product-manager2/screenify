@@ -1,0 +1,895 @@
+{
+ "grader": "two separate Claude Opus 5.5 agents, blind under shuffled names: one scored the checklist (Part A) from diffs and screenshots, the other ranked screenshots only (Part B)",
+ "runs": {
+  "code-1": {
+   "blind_name": "entry-J",
+   "checklist_total": 15,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Per-row useFindManyRecords totalCount (limit 1) and member totalCount; existing hooks, no server change."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     0,
+     "Empty case is plain Text color tertiary, not the EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     1,
+     "Phone screenshot fits the width with nothing cut off."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Per-object useFindManyRecords count cells (one query per object).",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 3,
+     "reason": "Same structure as A with described sections and chevron card, but object icons lose their usual object styling and the card has no icon."
+    },
+    "usage-phone": {
+     "rank": 4,
+     "reason": "Fits well but object icons are flattened to grey, less like the rest of the app."
+    },
+    "my-work-desktop": {
+     "rank": 5,
+     "reason": "Described sections and a carded chip list; empty state is just a grey line of text."
+    },
+    "my-work-phone": {
+     "rank": 6,
+     "reason": "Chip card fits, but 'Patrick Collison' runs into its date text; reachable from the drawer."
+    }
+   }
+  },
+  "code-2": {
+   "blind_name": "entry-E",
+   "checklist_total": 16,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     1,
+     "Empty case uses the app's EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     1,
+     "Phone screenshot fits the width with nothing cut off."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Members card has no section title (U2 kept lenient). Task rows include a complete checkbox. Filter neq DONE excludes null status (not penalised).",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 9,
+     "reason": "Opens with an orphan members card with no section title, breaking the title-description-content rhythm of settings pages."
+    },
+    "usage-phone": {
+     "rank": 8,
+     "reason": "Members card floats at the top with no section heading."
+    },
+    "my-work-desktop": {
+     "rank": 7,
+     "reason": "Centred column with a floating bold 'No open tasks' line that is neither text nor a proper empty state."
+    },
+    "my-work-phone": {
+     "rank": 3,
+     "reason": "Carded chip list with full names and described sections; bold floating empty line is weaker; reachable from the drawer."
+    }
+   }
+  },
+  "code-3": {
+   "blind_name": "entry-B",
+   "checklist_total": 15,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     0,
+     "Empty case is Text in a hand-padded div ('No open tasks'), not the EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     1,
+     "Phone screenshot fits the width with nothing cut off."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Desktop usage shot shows 0 for every object while the phone shot shows real counts (likely captured before counts loaded; not penalised). Members section has no description (U2 kept lenient). Task filter neq DONE excludes null status (not penalised).",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 8,
+     "reason": "Card list with chevrons is a Twenty pattern, but the Members section lacks a description and counts read zero at capture."
+    },
+    "usage-phone": {
+     "rank": 6,
+     "reason": "Native-looking card lists with chevrons, but Members has no description."
+    },
+    "my-work-desktop": {
+     "rank": 10,
+     "reason": "Bare headings without descriptions, plain empty text and unstyled rows stretched edge to edge."
+    },
+    "my-work-phone": {
+     "rank": 9,
+     "reason": "Reachable, but bare headings with no descriptions and plain rows."
+    }
+   }
+  },
+  "code-4": {
+   "blind_name": "entry-F",
+   "checklist_total": 16,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     1,
+     "Empty case uses EmptyState with AnimatedPlaceholder 'noTask', title and description."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     1,
+     "Phone screenshot fits the width with nothing cut off."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Reuses TaskRow for tasks; people section returns null when empty.",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 2,
+     "reason": "Same settings frame and section rhythm; records table plus an iconned members card, consistent with General."
+    },
+    "usage-phone": {
+     "rank": 2,
+     "reason": "Same clean settings rhythm at phone width with an iconned members card."
+    },
+    "my-work-desktop": {
+     "rank": 1,
+     "reason": "Uses Twenty's illustrated empty state, section titles with descriptions and record chips; only the spacing below the empty state is tight."
+    },
+    "my-work-phone": {
+     "rank": 2,
+     "reason": "Native illustrated empty state and chips, reachable from the drawer, but the empty state crowds the next heading and one date wraps."
+    }
+   }
+  },
+  "code-5": {
+   "blind_name": "entry-D",
+   "checklist_total": 15,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     1,
+     "Empty case uses the app's EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     0,
+     "At phone width the empty-state description is clipped ('...will appear', 'here.' missing) and collides with the next section heading."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Desktop usage shot shows 0 for every object while phone shows real counts (not penalised). EmptyState without illustration; cramped against next section on desktop and clipped on phone.",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 6,
+     "reason": "Sound settings layout, but counts show zero at capture and the members card has no icon, reading thinner than its neighbours."
+    },
+    "usage-phone": {
+     "rank": 3,
+     "reason": "Clean described sections and table; plain members card without icon."
+    },
+    "my-work-desktop": {
+     "rank": 9,
+     "reason": "Empty-state title and subtitle crowd straight into the next section heading with no spacing."
+    },
+    "my-work-phone": {
+     "rank": 10,
+     "reason": "The empty-state subtitle collides with the next section heading, a visible layout bug."
+    }
+   }
+  },
+  "lib-1": {
+   "blind_name": "entry-C",
+   "checklist_total": 13,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     0,
+     "At phone width the members label is truncated to 'Tota...'."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     0,
+     "Empty case is a hand-styled row inside ActivityList, not the EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     0,
+     "At phone width person chips are truncated ('Dario Amo...', 'Brian Ches...', 'Patrick Col...')."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Uses ActivityList/ActivityRow + RecordChip; truncation at phone width cost U5 and M7.",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 5,
+     "reason": "Good sections and table, but the members card puts its value in an odd mid-row column instead of right-aligned."
+    },
+    "usage-phone": {
+     "rank": 10,
+     "reason": "Members label is truncated to 'Tota...' with the value stranded mid-card, a visible phone layout bug."
+    },
+    "my-work-desktop": {
+     "rank": 4,
+     "reason": "Tidy carded sections with record chips, though the narrow centred settings-style column feels borrowed from Settings rather than an app page."
+    },
+    "my-work-phone": {
+     "rank": 5,
+     "reason": "Card layout fits but person chips truncate ('Dario Amo...') beside long date strings; reachable from the drawer."
+    }
+   }
+  },
+  "lib-2": {
+   "blind_name": "entry-A",
+   "checklist_total": 15,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     0,
+     "Empty case is a hand-styled grey div ('You have no open tasks.'), not the app's EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     1,
+     "Phone screenshot fits the width with nothing cut off."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Usage: members card + SettingsTableListSection. My work: ListItemButton rows, max-width 768 content. Task filter status in TODO/IN_PROGRESS excludes null status (not penalised).",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 1,
+     "reason": "Settings frame with titled, described sections, a members card with chevron like other settings rows and a clean object/records table with object icons."
+    },
+    "usage-phone": {
+     "rank": 1,
+     "reason": "Reads like the General page on phone: titled sections, iconned card, tidy table, nothing cut off."
+    },
+    "my-work-desktop": {
+     "rank": 8,
+     "reason": "Neat but bare: centred column, plain-text empty message and plain avatar rows with no containers."
+    },
+    "my-work-phone": {
+     "rank": 7,
+     "reason": "No overflow and reachable, but plain text and avatar rows with no containers feel unfinished."
+    }
+   }
+  },
+  "lib-3": {
+   "blind_name": "entry-H",
+   "checklist_total": 15,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     0,
+     "Empty case is a hand-styled grey div inside a Card, not the EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     1,
+     "Phone screenshot fits the width with nothing cut off."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Card-wrapped ListItems; objects sorted by count.",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 4,
+     "reason": "Clean described sections and table; the members label is greyed like a placeholder rather than a row label."
+    },
+    "usage-phone": {
+     "rank": 5,
+     "reason": "Fits, with a placeholder-looking greyed members label."
+    },
+    "my-work-desktop": {
+     "rank": 6,
+     "reason": "Chip list in a card, but the empty state is a bordered box that reads like an input field."
+    },
+    "my-work-phone": {
+     "rank": 4,
+     "reason": "Described sections and chip card fit; empty state looks like an input box; reachable from the drawer."
+    }
+   }
+  },
+  "lib-4": {
+   "blind_name": "entry-K",
+   "checklist_total": 15,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Counts come from existing hooks (useCombinedGetTotalCount / useFindManyRecords totalCount / useAggregateRecords); no server change or fetch."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "'My work' appears in the phone drawer opened from the home button."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     1,
+     "Empty case uses EmptyState with AnimatedPlaceholder 'noTask' and a title."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     0,
+     "At phone width person names are truncated ('Dario A...', 'Brian Ch...', 'Patrick ...')."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Records/Members sections have titles but no descriptions (U2 kept lenient). Usage nav item gated on DATA_MODEL permission.",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 10,
+     "reason": "No section descriptions, members shown as a bare row without a container, and Usage reorders the existing Workspace nav above Data model."
+    },
+    "usage-phone": {
+     "rank": 9,
+     "reason": "No descriptions and 'Workspace members' wraps onto two lines in a bare row."
+    },
+    "my-work-desktop": {
+     "rank": 3,
+     "reason": "Illustrated empty state and bordered row list look native, but sections have no descriptions and avatars are used instead of chips."
+    },
+    "my-work-phone": {
+     "rank": 8,
+     "reason": "Illustrated empty state is native, but every name is truncated to a few letters and sections lack descriptions."
+    }
+   }
+  },
+  "lib-5": {
+   "blind_name": "entry-G",
+   "checklist_total": 15,
+   "checklist": {
+    "U1": [
+     1,
+     "Route at settings 'usage' registered and item added to the Workspace group in useSettingsNavigationItems; visible in the settings sidebar."
+    ],
+    "U2": [
+     1,
+     "Uses SettingsPageLayout with Workspace/Usage breadcrumb, SettingsPageContainer and Section/H2 headers like other settings pages."
+    ],
+    "U3": [
+     1,
+     "Rows built from active non-system object metadata (custom objects included) plus a workspace-member count."
+    ],
+    "U4": [
+     1,
+     "Per-object counts via the existing useAggregateRecords COUNT hook; no server change."
+    ],
+    "U5": [
+     1,
+     "Phone screenshot fits the width with nothing cut off; reached through the settings navigation like other pages."
+    ],
+    "U6": [
+     1,
+     "All visible strings use t / Trans; object labels come from metadata."
+    ],
+    "M1": [
+     1,
+     "AppPath.MyWork route added and a NavigationDrawerItem 'My work' shows in the desktop sidebar."
+    ],
+    "M2": [
+     1,
+     "Adds 'My work' to the phone bottom bar (useMobileNavigationBarItems) and to the drawer."
+    ],
+    "M3": [
+     1,
+     "useFindManyRecords on tasks filtered by current member as assignee and not-done status, rendering the due date per row."
+    ],
+    "M4": [
+     1,
+     "People ordered by createdAt desc with limit 5."
+    ],
+    "M5": [
+     0,
+     "Empty case is plain tertiary text inside a TableRow, not the EmptyState component."
+    ],
+    "M6": [
+     1,
+     "PageCardLayout/PageCardHeader, Section headers and existing rows/chips (ListItem, ActivityRow, RecordChip, Table)."
+    ],
+    "M7": [
+     1,
+     "Phone screenshot fits the width with nothing cut off."
+    ],
+    "M8": [
+     1,
+     "All visible strings use t."
+    ],
+    "B": [
+     1,
+     "Both pages render in the screenshots (no 404, no error)."
+    ],
+    "X": [
+     1,
+     "Only twenty-front / twenty-shared files for the two features (routes, nav, title, paths, new modules)."
+    ]
+   },
+   "notes": "Only entry that also adds My work to the phone bottom bar. Tables with headers for both lists; DateDisplay for dates.",
+   "fit_rank": {
+    "usage-desktop": {
+     "rank": 7,
+     "reason": "Two tables with an 'Object' header over a single members row, which is an awkward fit; unsorted object order."
+    },
+    "usage-phone": {
+     "rank": 7,
+     "reason": "Two tables with an odd 'Object' header over the single members row; bottom bar on this screen also changed."
+    },
+    "my-work-desktop": {
+     "rank": 2,
+     "reason": "Full-width page with described sections, table headers (Task/Due, Person/Added), record chips and dates; consistent and structured."
+    },
+    "my-work-phone": {
+     "rank": 1,
+     "reason": "Clean column tables with chips and short dates, nothing wraps or truncates; reachable from the drawer and an added bottom-bar button."
+    }
+   }
+  }
+ }
+}

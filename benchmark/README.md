@@ -110,6 +110,15 @@ on both apps (Memos 50, 49 and 50 of 51; Twenty 47 of 48 each), with the library
 quarter more per run. Wording that tells agents to open the image got Haiku to open screenshots in
 4 of 6 runs, but did not change what it built.
 
+## Test 5: two new screens on a large app
+
+Larger changes, where drift should show: Haiku builds two new Twenty pages (a Settings page and a
+"My work" page) that must fit the app at desktop and phone width. Five runs per arm, a blind
+checklist and a blind screenshots-only ranking. A tie: checklist 77/80 code only, 73/80 with the
+library; fit rank 5.65 vs 5.35 (5.5 is chance). Every library run opened two to four screenshots
+before editing, but of the frame it sat beside, not of the empty state the runs got wrong. Details
+in [`large-screens/`](large-screens/).
+
 ## Method
 
 - **App.** Memos v26.11.0 (MIT), started with

@@ -1,0 +1,234 @@
+{
+ "code-1": {
+  "cost_usd_list_price": 0.8958,
+  "seconds": 465,
+  "turns": 132,
+  "tool_calls": 131,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 148,
+  "output_tokens": 73106,
+  "cache_read": 11549255,
+  "cache_write": 245955,
+  "ok": true
+ },
+ "code-2": {
+  "cost_usd_list_price": 1.5003,
+  "seconds": 616,
+  "turns": 160,
+  "tool_calls": 159,
+  "denied_tool_calls": 1,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 236,
+  "output_tokens": 91212,
+  "cache_read": 21783560,
+  "cache_write": 297270,
+  "ok": true
+ },
+ "code-3": {
+  "cost_usd_list_price": 1.0365,
+  "seconds": 512,
+  "turns": 138,
+  "tool_calls": 137,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 194,
+  "output_tokens": 75516,
+  "cache_read": 14909587,
+  "cache_write": 247868,
+  "ok": true
+ },
+ "code-4": {
+  "cost_usd_list_price": 1.0973,
+  "seconds": 434,
+  "turns": 155,
+  "tool_calls": 154,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 186,
+  "output_tokens": 74731,
+  "cache_read": 15651704,
+  "cache_write": 264871,
+  "ok": true
+ },
+ "code-5": {
+  "cost_usd_list_price": 1.1047,
+  "seconds": 582,
+  "turns": 167,
+  "tool_calls": 166,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 190,
+  "output_tokens": 90636,
+  "cache_read": 15211429,
+  "cache_write": 270555,
+  "ok": true
+ },
+ "lib-1": {
+  "cost_usd_list_price": 1.229,
+  "seconds": 537,
+  "turns": 171,
+  "tool_calls": 170,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 4,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 2,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/settings/members/members--team-tab--desktop-1440x900--app-default.png",
+    "screens/web/settings/data-model/data-model--list--desktop-1440x900--app-default.png",
+    "screens/web/settings/general/general--default--desktop-1440x900--app-default.png",
+    "screens/web/navigation/main-navigation/main-navigation--default--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 180,
+  "output_tokens": 92275,
+  "cache_read": 16283130,
+  "cache_write": 305055,
+  "ok": true
+ },
+ "lib-2": {
+  "cost_usd_list_price": 0.9402,
+  "seconds": 360,
+  "turns": 150,
+  "tool_calls": 149,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 4,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 2,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/settings/members/members--team-tab--desktop-1440x900--app-default.png",
+    "screens/web/settings/data-model/data-model--list--desktop-1440x900--app-default.png",
+    "screens/web/navigation/main-navigation/main-navigation--default--desktop-1440x900--app-default.png",
+    "screens/web/agents/agent-list/agent-list--filled--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 180,
+  "output_tokens": 70868,
+  "cache_read": 13490739,
+  "cache_write": 239506,
+  "ok": true
+ },
+ "lib-3": {
+  "cost_usd_list_price": 1.252,
+  "seconds": 537,
+  "turns": 142,
+  "tool_calls": 141,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 3,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 1,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/settings/layout/layout--default--desktop-1440x900--app-default.png",
+    "screens/web/settings/general/general--default--desktop-1440x900--app-default.png",
+    "screens/web/navigation/main-navigation/main-navigation--default--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 184,
+  "output_tokens": 92494,
+  "cache_read": 16960499,
+  "cache_write": 300151,
+  "ok": true
+ },
+ "lib-4": {
+  "cost_usd_list_price": 0.9357,
+  "seconds": 466,
+  "turns": 134,
+  "tool_calls": 133,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 4,
+   "sidecars_opened": 1,
+   "index_opened": 1,
+   "searches_or_listings": 1,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/navigation/main-navigation/main-navigation--default--desktop-1440x900--app-default.png",
+    "screens/web/settings/members/members--team-tab--desktop-1440x900--app-default.png",
+    "screens/web/workflows/workflow-list/workflow-list--filled--desktop-1440x900--app-default.png",
+    "screens/web/records/record-detail/record-detail--tasks-tab--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 128,
+  "output_tokens": 85039,
+  "cache_read": 11044231,
+  "cache_write": 275359,
+  "ok": true
+ },
+ "lib-5": {
+  "cost_usd_list_price": 0.906,
+  "seconds": 527,
+  "turns": 136,
+  "tool_calls": 135,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 2,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 2,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/navigation/main-navigation/main-navigation--default--desktop-1440x900--app-default.png",
+    "screens/web/settings/members/members--team-tab--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 148,
+  "output_tokens": 92285,
+  "cache_read": 11303168,
+  "cache_write": 252121,
+  "ok": true
+ }
+}
