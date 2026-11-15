@@ -35,7 +35,9 @@ export function renderIndex(store: Store, manifest: Manifest, plan: Plan, status
   out.push(
     '**Before adding or changing a screen, dialog, menu or state, open the nearest existing screens and flows below.**',
     'Take what is shown (labels, order, which actions sit where, empty and edited states) from the images, and how it is',
-    'built (components, icons, styles, translation keys) from the code. To find them:',
+    'built (components, icons, styles, translation keys) from the code. A sidecar says in words what is on screen but',
+    'not how it looks: when your change adds or restyles anything visible, open the `.png` itself and match its size,',
+    'weight, colour and spacing to what sits next to it. To find them:',
     '',
     '- by a file you are about to edit: `grep -rl "src/path/to/File" screens flows --include=*.md` (sidecars list the source files that shape each image);',
     '- by visible text: `grep -rl "Button label" screens flows --include=*.md`;',

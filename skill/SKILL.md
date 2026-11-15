@@ -16,6 +16,9 @@ dialog, menu or state, not after:
    by feature.
 2. Open the images. Take **what is shown** from them: labels, order, which actions sit together,
    what an empty, edited or error state looks like, what already exists that you could reuse.
+   A sidecar describes a screen in words; it cannot show size, weight, colour or spacing. When
+   your change adds or restyles anything visible, open the `.png` itself (not only its sidecar)
+   and match what sits next to it.
 3. Take **how it is built** from the code: components, icons, styles, translation keys. A
    screenshot shows an icon without naming it; the code names it.
 4. If a capture is flagged STALE, the code changed since it was taken: trust the code where they

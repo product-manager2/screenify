@@ -18,7 +18,7 @@ export function skillSourceDir(): string {
  * an agent that is told only where the library is does not open it before editing a screen.
  */
 export const POINTER_LINE =
-  '**App screenshots:** before adding or changing a screen, dialog, menu or state, open the nearest existing screens and flows in `screenify-out/INDEX.md` (managed by Screenify): take what is shown from the images and how it is built from the code.';
+  '**App screenshots:** before adding or changing a screen, dialog, menu or state, open the nearest existing screens and flows in `screenify-out/INDEX.md` (managed by Screenify): take what is shown from the images (open the `.png`, not only its text sidecar, when your change adds or restyles anything visible) and how it is built from the code.';
 
 /** Cheap Codex model the generated custom agent and profile pin; OpenAI's docs name it for light subagent work. */
 export const CODEX_MODEL = 'gpt-6-luna';
