@@ -16,9 +16,12 @@ dialog, menu or state, not after:
    by feature.
 2. Open the images. Take **what is shown** from them: labels, order, which actions sit together,
    what an empty, edited or error state looks like, what already exists that you could reuse.
-   A sidecar describes a screen in words; it cannot show size, weight, colour or spacing. When
-   your change adds or restyles anything visible, open the `.png` itself (not only its sidecar)
-   and match what sits next to it.
+   A sidecar describes a screen in words; it cannot show size, weight, colour, spacing or how
+   steps connect. Open the `.png` itself (not only its sidecar) when your change:
+   - adds or restyles anything visible: match what sits next to it;
+   - touches an empty, error, loading or other edge state: open that state's capture to see what
+     the app shows today;
+   - changes a step of a flow: open the flow board to see the steps before and after it.
 3. Take **how it is built** from the code: components, icons, styles, translation keys. A
    screenshot shows an icon without naming it; the code names it.
 4. If a capture is flagged STALE, the code changed since it was taken: trust the code where they
