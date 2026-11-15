@@ -13,8 +13,12 @@ export function skillSourceDir(): string {
   return join(dirname(fileURLToPath(import.meta.url)), '..', 'skill');
 }
 
-/** Line `init` adds to CLAUDE.md and AGENTS.md. */
-export const POINTER_LINE = 'App screenshots: see `screenify-out/INDEX.md` (managed by Screenify).';
+/**
+ * Line `init` puts near the top of CLAUDE.md and AGENTS.md. It says when to look, not only where:
+ * an agent that is told only where the library is does not open it before editing a screen.
+ */
+export const POINTER_LINE =
+  '**App screenshots:** before adding or changing a screen, dialog, menu or state, open the nearest existing screens and flows in `screenify-out/INDEX.md` (managed by Screenify): take what is shown from the images (open the `.png`, not only its text sidecar, when your change adds or restyles anything visible, touches an empty, error or edge state, or is a step in a flow) and how it is built from the code.';
 
 /** Cheap Codex model the generated custom agent and profile pin; OpenAI's docs name it for light subagent work. */
 export const CODEX_MODEL = 'gpt-6-luna';
@@ -49,21 +53,50 @@ export function ensureGitignore(repoRoot: string): InitChange {
   return { path, action: text ? 'updated' : 'created' };
 }
 
-/** Appends the INDEX.md pointer to CLAUDE.md and AGENTS.md when they exist and lack it. */
+/**
+ * Places the pointer where an agent reads before it edits: right after the file's first heading, or
+ * first when it has none. An older pointer (any line naming `screenify-out/INDEX.md`) is replaced;
+ * a current one is left wherever the user put it.
+ */
+export function withPointer(text: string): string {
+  if (text.includes(POINTER_LINE)) return text;
+  const lines = text.split('\n').filter((l) => !l.includes('screenify-out/INDEX.md'));
+  while (lines.length > 1 && lines[lines.length - 1] === '' && lines[lines.length - 2] === '') lines.pop();
+  const h1 = lines.findIndex((l) => /^# /.test(l));
+  if (h1 === -1) return [POINTER_LINE, '', ...lines].join('\n');
+  const rest = lines.slice(h1 + 1);
+  while (rest[0] === '') rest.shift();
+  return [...lines.slice(0, h1 + 1), '', POINTER_LINE, '', ...rest].join('\n');
+}
+
+/** Puts the INDEX.md pointer near the top of CLAUDE.md and AGENTS.md when they exist. */
 export function ensurePointers(repoRoot: string): InitChange[] {
   const out: InitChange[] = [];
   for (const name of ['CLAUDE.md', 'AGENTS.md']) {
     const path = join(repoRoot, name);
     if (!existsSync(path)) continue;
     const text = readFileSync(path, 'utf8');
-    if (text.includes('screenify-out/INDEX.md')) {
+    const next = withPointer(text);
+    if (next === text) {
       out.push({ path, action: 'unchanged' });
       continue;
     }
-    writeFileAtomic(path, `${text}${text.endsWith('\n') ? '' : '\n'}\n${POINTER_LINE}\n`);
+    writeFileAtomic(path, next);
     out.push({ path, action: 'updated' });
   }
   return out;
+}
+
+/**
+ * Installs the skill into the repository too (`.claude/skills/` for Claude Code, `.agents/skills/`
+ * for Codex), so every teammate's agent sees when to open the library without running `init`.
+ */
+export function installRepoSkills(repoRoot: string): InitChange[] {
+  const skill = readFileSync(join(skillSourceDir(), 'SKILL.md'), 'utf8');
+  return ['.claude', '.agents'].map((dir) => {
+    const path = join(repoRoot, dir, 'skills', 'screenify', 'SKILL.md');
+    return { path, action: writeIfChanged(path, skill), note: 'repository copy, meant to be committed' };
+  });
 }
 
 /** Claude Code custom agents `init` installs, by file name under `skill/agents/`. */
@@ -179,7 +212,10 @@ export function init(cwd: string, opts: { skills?: boolean } = {}): InitResult {
     changes.push({ path: paths.config, action: 'created' });
   }
   writeIndex(store);
-  if (opts.skills !== false) changes.push(...installSkills());
+  if (opts.skills !== false) {
+    changes.push(...installSkills());
+    if (store.shared) changes.push(...installRepoSkills(store.repoRoot));
+  }
   changes.push(...ensurePointers(store.repoRoot));
   return { store, changes, linkNote: sc.note };
 }

@@ -1,0 +1,582 @@
+diff --git a/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx b/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx
+index 83f57691..484d5bd7 100644
+--- a/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx
++++ b/packages/twenty-front/src/modules/app/components/SettingsRoutes.tsx
+@@ -552,6 +552,12 @@ const SettingsBillingLimitEdit = lazy(() =>
+   ),
+ );
+ 
++const SettingsWorkspaceUsage = lazy(() =>
++  import('~/pages/settings/usage/SettingsWorkspaceUsage').then((module) => ({
++    default: module.SettingsWorkspaceUsage,
++  })),
++);
++
+ const SettingsUsageUserDetail = lazy(() =>
+   import('~/pages/settings/billing/SettingsUsageUserDetail').then((module) => ({
+     default: module.SettingsUsageUserDetail,
+@@ -931,6 +937,10 @@ const createSettingsRouteElements = ({
+       }
+     >
+       <Route path={SettingsPath.General} element={<SettingsGeneral />} />
++      <Route
++        path={SettingsPath.WorkspaceUsage}
++        element={<SettingsWorkspaceUsage />}
++      />
+       <Route
+         path={SettingsPath.WorkspaceCommunications}
+         element={<SettingsWorkspaceCommunications />}
+diff --git a/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx b/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx
+index 36348f3c..fef43192 100644
+--- a/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx
++++ b/packages/twenty-front/src/modules/app/routing/utils/createWorkspaceRouteObjects.tsx
+@@ -72,6 +72,12 @@ const AiChatInboxPage = lazy(() =>
+   })),
+ );
+ 
++const MyWorkPage = lazy(() =>
++  import('~/pages/my-work/MyWorkPage').then((module) => ({
++    default: module.MyWorkPage,
++  })),
++);
++
+ const MobileHomePage = lazy(() =>
+   import('~/pages/mobile-home/MobileHomePage').then((module) => ({
+     default: module.MobileHomePage,
+@@ -215,6 +221,14 @@ export const createWorkspaceRouteObjects = ({
+         </LazyRoute>
+       ),
+     },
++    {
++      path: AppPath.MyWork,
++      element: (
++        <LazyRoute>
++          <MyWorkPage />
++        </LazyRoute>
++      ),
++    },
+     {
+       path: SETTINGS_ROOT_PATH,
+       element: <SettingsRouteOutlet />,
+diff --git a/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx b/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx
+index a987aea8..f0a9ba6a 100644
+--- a/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx
++++ b/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerScrollableItems.tsx
+@@ -1,4 +1,5 @@
+ import { GettingStartedOpenedSection } from '@/getting-started/components/GettingStartedOpenedSection';
++import { MainNavigationDrawerMyWorkItem } from '@/navigation/components/MainNavigationDrawerMyWorkItem';
+ import { NavigationDrawerOpenedSection } from '@/navigation-menu-item/display/sections/components/NavigationDrawerOpenedSection';
+ import { NavigationDrawerWorkspaceSectionSkeletonLoader } from '@/object-metadata/components/NavigationDrawerWorkspaceSectionSkeletonLoader';
+ 
+@@ -34,6 +35,7 @@ export const MainNavigationDrawerScrollableItems = () => {
+     <StyledScrollableItemsContainer>
+       <NavigationDrawerOpenedSection />
+       <GettingStartedOpenedSection />
++      <MainNavigationDrawerMyWorkItem />
+       <Suspense fallback={<NavigationDrawerWorkspaceSectionSkeletonLoader />}>
+         <FavoritesSectionDispatcher />
+         <WorkspaceSectionDispatcher />
+diff --git a/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx b/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx
+index 5acde8af..354a6d7b 100644
+--- a/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx
++++ b/packages/twenty-front/src/modules/settings/hooks/useSettingsNavigationItems.tsx
+@@ -17,6 +17,7 @@ import {
+   IconApps,
+   IconAt,
+   IconCalendarEvent,
++  IconChartBar,
+   IconCode,
+   IconColorSwatch,
+   type IconComponent,
+@@ -149,6 +150,12 @@ const useSettingsNavigationItems = (): SettingsNavigationSection[] => {
+           Icon: IconUsers,
+           isHidden: !permissionFlagMap[PermissionFlagType.WORKSPACE_MEMBERS],
+         },
++        {
++          label: t`Usage`,
++          path: SettingsPath.WorkspaceUsage,
++          Icon: IconChartBar,
++          isHidden: !permissionFlagMap[PermissionFlagType.WORKSPACE],
++        },
+         {
+           label: t`Billing`,
+           path: SettingsPath.Billing,
+diff --git a/packages/twenty-front/src/utils/title-utils.ts b/packages/twenty-front/src/utils/title-utils.ts
+index bc874c1f..deb599b6 100644
+--- a/packages/twenty-front/src/utils/title-utils.ts
++++ b/packages/twenty-front/src/utils/title-utils.ts
+@@ -14,6 +14,7 @@ enum SettingsPathPrefixes {
+   LogicFunctions = `${AppBasePath.Settings}/${SettingsPath.LogicFunctions}`,
+   Integration = `${AppBasePath.Settings}/${SettingsPath.Integrations}`,
+   General = `${AppBasePath.Settings}/${SettingsPath.General}`,
++  WorkspaceUsage = `${AppBasePath.Settings}/${SettingsPath.WorkspaceUsage}`,
+   Community = `${AppBasePath.Settings}/${SettingsPath.Community}`,
+ }
+ 
+@@ -63,6 +64,10 @@ export const getPageTitleFromPath = (pathname: string): string => {
+       return t`Integrations - Settings`;
+     case SettingsPathPrefixes.General:
+       return t`General - Settings`;
++    case SettingsPathPrefixes.WorkspaceUsage:
++      return t`Usage - Settings`;
++    case AppPath.MyWork:
++      return t`My work`;
+     case SettingsPathPrefixes.Community:
+       return t`Community - Settings`;
+     default:
+diff --git a/packages/twenty-shared/src/types/AppPath.ts b/packages/twenty-shared/src/types/AppPath.ts
+index a85e3474..2eb86cb1 100644
+--- a/packages/twenty-shared/src/types/AppPath.ts
++++ b/packages/twenty-shared/src/types/AppPath.ts
+@@ -21,6 +21,7 @@ export enum AppPath {
+   Home = '/home',
+   TasksPage = '/objects/tasks',
+   OpportunitiesPage = '/objects/opportunities',
++  MyWork = '/my-work',
+ 
+   RecordIndexPage = '/objects/:objectNamePlural',
+   RecordShowPage = '/object/:objectNameSingular/:objectRecordId',
+diff --git a/packages/twenty-shared/src/types/SettingsPath.ts b/packages/twenty-shared/src/types/SettingsPath.ts
+index e5a5b43d..29262f6d 100644
+--- a/packages/twenty-shared/src/types/SettingsPath.ts
++++ b/packages/twenty-shared/src/types/SettingsPath.ts
+@@ -44,6 +44,7 @@ export enum SettingsPath {
+   Layout = 'layout',
+   WorkspaceMembersPage = 'members',
+   WorkspaceMemberPage = 'members/:workspaceMemberId',
++  WorkspaceUsage = 'usage',
+   General = 'general',
+   Subdomain = 'general/subdomain',
+   CustomDomain = 'general/custom-domain',
+diff --git a/packages/twenty-front/src/modules/my-work/components/MyWorkOpenTasksSection.tsx b/packages/twenty-front/src/modules/my-work/components/MyWorkOpenTasksSection.tsx
+new file mode 100644
+index 00000000..f5186101
+--- /dev/null
++++ b/packages/twenty-front/src/modules/my-work/components/MyWorkOpenTasksSection.tsx
+@@ -0,0 +1,87 @@
++import { ActivityList } from '@/activities/components/ActivityList';
++import { SkeletonLoader } from '@/activities/components/SkeletonLoader';
++import { TaskRow } from '@/activities/tasks/components/TaskRow';
++import { type Task } from '@/activities/types/Task';
++import { useFindManyRecords } from '@/object-record/hooks/useFindManyRecords';
++import { AnimatedPlaceholder } from '@/ui/feedback/empty-state/components/AnimatedPlaceholder/AnimatedPlaceholder';
++import { EmptyState } from '@/ui/feedback/empty-state/components/EmptyState';
++import { useLingui } from '@lingui/react/macro';
++import { useMemo } from 'react';
++import {
++  type RecordGqlOperationFilter,
++  StandardObjectNameSingular,
++} from 'twenty-shared/types';
++import { isDefined } from 'twenty-shared/utils';
++import { Section } from 'twenty-ui/components/layout';
++
++const MY_WORK_OPEN_TASKS_LIMIT = 200;
++
++type MyWorkOpenTasksSectionProps = {
++  workspaceMemberId: string | undefined;
++};
++
++export const MyWorkOpenTasksSection = ({
++  workspaceMemberId,
++}: MyWorkOpenTasksSectionProps) => {
++  const { t } = useLingui();
++
++  const openTasksFilter: RecordGqlOperationFilter = useMemo(
++    () => ({
++      and: [
++        { assigneeId: { eq: workspaceMemberId ?? '' } },
++        { or: [{ status: { neq: 'DONE' } }, { status: { is: 'NULL' } }] },
++      ],
++    }),
++    [workspaceMemberId],
++  );
++
++  const { records: tasks, loading } = useFindManyRecords<Task>({
++    objectNameSingular: StandardObjectNameSingular.Task,
++    filter: openTasksFilter,
++    orderBy: [{ dueAt: 'AscNullsLast' }],
++    skip: !isDefined(workspaceMemberId),
++    limit: MY_WORK_OPEN_TASKS_LIMIT,
++  });
++
++  const renderContent = () => {
++    if (loading && tasks.length === 0) {
++      return <SkeletonLoader />;
++    }
++
++    if (tasks.length === 0) {
++      return (
++        <EmptyState.Root>
++          <AnimatedPlaceholder type="noTask" />
++          <EmptyState.Content>
++            <EmptyState.Title>{t`No open tasks`}</EmptyState.Title>
++            <EmptyState.Description>
++              {t`All tasks assigned to you are done.`}
++            </EmptyState.Description>
++          </EmptyState.Content>
++        </EmptyState.Root>
++      );
++    }
++
++    return (
++      <ActivityList>
++        {tasks.map((task, index) => (
++          <TaskRow
++            key={task.id}
++            task={task}
++            divider={index < tasks.length - 1}
++          />
++        ))}
++      </ActivityList>
++    );
++  };
++
++  return (
++    <Section.Root>
++      <Section.Header
++        title={t`Open tasks`}
++        description={t`Tasks assigned to you that aren't done`}
++      />
++      {renderContent()}
++    </Section.Root>
++  );
++};
+diff --git a/packages/twenty-front/src/modules/my-work/components/MyWorkRecentPeopleSection.tsx b/packages/twenty-front/src/modules/my-work/components/MyWorkRecentPeopleSection.tsx
+new file mode 100644
+index 00000000..d2859619
+--- /dev/null
++++ b/packages/twenty-front/src/modules/my-work/components/MyWorkRecentPeopleSection.tsx
+@@ -0,0 +1,66 @@
++import { styled } from '@linaria/react';
++import { useLingui } from '@lingui/react/macro';
++import { StandardObjectNameSingular } from 'twenty-shared/types';
++import { Section } from 'twenty-ui/components/layout';
++import { Text } from 'twenty-ui/primitives/typography';
++import { themeCssVariables } from 'twenty-ui/theme';
++
++import { dateLocaleState } from '@/localization/states/dateLocaleState';
++import { RecordChip } from '@/object-record/components/RecordChip';
++import { useFindManyRecords } from '@/object-record/hooks/useFindManyRecords';
++import { type Person } from '@/people/types/Person';
++import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
++import { beautifyPastDateRelativeToNow } from '~/utils/date-utils';
++
++const MY_WORK_RECENT_PEOPLE_LIMIT = 5;
++
++const StyledPeopleList = styled.div`
++  display: flex;
++  flex-direction: column;
++  gap: ${themeCssVariables.spacing[2]};
++`;
++
++const StyledPersonRow = styled.div`
++  align-items: center;
++  display: flex;
++  gap: ${themeCssVariables.spacing[2]};
++  justify-content: space-between;
++  min-width: 0;
++`;
++
++export const MyWorkRecentPeopleSection = () => {
++  const { t } = useLingui();
++  const { localeCatalog } = useAtomStateValue(dateLocaleState);
++
++  const { records: people } = useFindManyRecords<Person>({
++    objectNameSingular: StandardObjectNameSingular.Person,
++    orderBy: [{ createdAt: 'DescNullsLast' }],
++    limit: MY_WORK_RECENT_PEOPLE_LIMIT,
++  });
++
++  if (people.length === 0) {
++    return null;
++  }
++
++  return (
++    <Section.Root>
++      <Section.Header
++        title={t`Recently added people`}
++        description={t`The latest people added to this workspace`}
++      />
++      <StyledPeopleList>
++        {people.map((person) => (
++          <StyledPersonRow key={person.id}>
++            <RecordChip
++              objectNameSingular={StandardObjectNameSingular.Person}
++              record={person}
++            />
++            <Text size="sm" color="light">
++              {t`Created ${beautifyPastDateRelativeToNow(person.createdAt, localeCatalog)}`}
++            </Text>
++          </StyledPersonRow>
++        ))}
++      </StyledPeopleList>
++    </Section.Root>
++  );
++};
+diff --git a/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerMyWorkItem.tsx b/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerMyWorkItem.tsx
+new file mode 100644
+index 00000000..e5e4c7ea
+--- /dev/null
++++ b/packages/twenty-front/src/modules/navigation/components/MainNavigationDrawerMyWorkItem.tsx
+@@ -0,0 +1,23 @@
++import { NavigationDrawerItem } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerItem';
++import { NavigationDrawerSection } from '@/ui/navigation/navigation-drawer/components/NavigationDrawerSection';
++import { useLingui } from '@lingui/react/macro';
++import { useMatch } from 'react-router-dom';
++import { AppPath } from 'twenty-shared/types';
++import { isDefined } from 'twenty-shared/utils';
++import { IconListCheck } from 'twenty-ui/icon';
++
++export const MainNavigationDrawerMyWorkItem = () => {
++  const { t } = useLingui();
++  const isMyWorkPageOpen = isDefined(useMatch(AppPath.MyWork));
++
++  return (
++    <NavigationDrawerSection>
++      <NavigationDrawerItem
++        label={t`My work`}
++        to={AppPath.MyWork}
++        Icon={IconListCheck}
++        active={isMyWorkPageOpen}
++      />
++    </NavigationDrawerSection>
++  );
++};
+diff --git a/packages/twenty-front/src/modules/settings/usage/components/SettingsWorkspaceUsageMembersSection.tsx b/packages/twenty-front/src/modules/settings/usage/components/SettingsWorkspaceUsageMembersSection.tsx
+new file mode 100644
+index 00000000..7eade670
+--- /dev/null
++++ b/packages/twenty-front/src/modules/settings/usage/components/SettingsWorkspaceUsageMembersSection.tsx
+@@ -0,0 +1,40 @@
++import { useLingui } from '@lingui/react/macro';
++import { StandardObjectNamePlural } from '@/object-metadata/types/StandardObjectNamePlural';
++import { isDefined } from 'twenty-shared/utils';
++import { Section } from 'twenty-ui/components/layout';
++import { IconUsers } from 'twenty-ui/icon';
++import { Card } from 'twenty-ui/primitives/surfaces';
++
++import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
++import { useCombinedGetTotalCount } from '@/object-record/multiple-objects/hooks/useCombinedGetTotalCount';
++import { SettingsListItemCardContent } from '@/settings/components/SettingsListItemCardContent';
++
++export const SettingsWorkspaceUsageMembersSection = () => {
++  const { t } = useLingui();
++  const { formatNumber } = useNumberFormat();
++  const { totalCountByObjectMetadataItemNamePlural } =
++    useCombinedGetTotalCount();
++
++  const membersCount =
++    totalCountByObjectMetadataItemNamePlural[
++      StandardObjectNamePlural.WorkspaceMember
++    ];
++
++  return (
++    <Section.Root>
++      <Section.Header
++        title={t`Members`}
++        description={t`People with access to this workspace`}
++      />
++      <Card.Root>
++        <SettingsListItemCardContent
++          label={t`Total`}
++          LeftIcon={IconUsers}
++          rightComponent={
++            isDefined(membersCount) ? formatNumber(membersCount) : ''
++          }
++        />
++      </Card.Root>
++    </Section.Root>
++  );
++};
+diff --git a/packages/twenty-front/src/modules/settings/usage/components/SettingsWorkspaceUsageRecordsSection.tsx b/packages/twenty-front/src/modules/settings/usage/components/SettingsWorkspaceUsageRecordsSection.tsx
+new file mode 100644
+index 00000000..bbc045bd
+--- /dev/null
++++ b/packages/twenty-front/src/modules/settings/usage/components/SettingsWorkspaceUsageRecordsSection.tsx
+@@ -0,0 +1,96 @@
++import { styled } from '@linaria/react';
++import { useLingui } from '@lingui/react/macro';
++import { useMemo } from 'react';
++import { StandardObjectNameSingular } from 'twenty-shared/types';
++import { isDefined } from 'twenty-shared/utils';
++import { themeCssVariables, useTheme } from 'twenty-ui/theme';
++
++import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
++import { ObjectMetadataIcon } from '@/object-metadata/components/ObjectMetadataIcon';
++import { useFilteredObjectMetadataItems } from '@/object-metadata/hooks/useFilteredObjectMetadataItems';
++import { type EnrichedObjectMetadataItem } from '@/object-metadata/types/EnrichedObjectMetadataItem';
++import { useCombinedGetTotalCount } from '@/object-record/multiple-objects/hooks/useCombinedGetTotalCount';
++import { SettingsTableListSection } from '@/settings/components/SettingsTableListSection';
++
++const StyledObjectNameCell = styled.div`
++  align-items: center;
++  display: flex;
++  gap: ${themeCssVariables.spacing[2]};
++  min-width: 0;
++`;
++
++type SettingsWorkspaceUsageRecordsRow = {
++  id: string;
++  objectMetadataItem: EnrichedObjectMetadataItem;
++  totalCount: number | undefined;
++};
++
++export const SettingsWorkspaceUsageRecordsSection = () => {
++  const { t } = useLingui();
++  const theme = useTheme();
++  const { formatNumber } = useNumberFormat();
++  const { activeNonSystemObjectMetadataItems } =
++    useFilteredObjectMetadataItems();
++  const { totalCountByObjectMetadataItemNamePlural } =
++    useCombinedGetTotalCount();
++
++  const rows: SettingsWorkspaceUsageRecordsRow[] = useMemo(
++    () =>
++      activeNonSystemObjectMetadataItems
++        .filter(
++          (objectMetadataItem) =>
++            objectMetadataItem.nameSingular !==
++            StandardObjectNameSingular.WorkspaceMember,
++        )
++        .map((objectMetadataItem) => ({
++          id: objectMetadataItem.id,
++          objectMetadataItem,
++          totalCount:
++            totalCountByObjectMetadataItemNamePlural[
++              objectMetadataItem.namePlural
++            ],
++        }))
++        .sort((rowA, rowB) =>
++          rowA.objectMetadataItem.labelPlural.localeCompare(
++            rowB.objectMetadataItem.labelPlural,
++          ),
++        ),
++    [
++      activeNonSystemObjectMetadataItems,
++      totalCountByObjectMetadataItemNamePlural,
++    ],
++  );
++
++  return (
++    <SettingsTableListSection<SettingsWorkspaceUsageRecordsRow>
++      title={t`Records`}
++      description={t`Number of records in each object`}
++      items={rows}
++      columns={[
++        {
++          label: t`Object`,
++          Cell: ({ item }) => (
++            <StyledObjectNameCell>
++              <ObjectMetadataIcon
++                objectMetadataItem={item.objectMetadataItem}
++                size={theme.icon.size.md}
++                stroke={theme.icon.stroke.sm}
++              />
++              {item.objectMetadataItem.labelPlural}
++            </StyledObjectNameCell>
++          ),
++        },
++        {
++          label: t`Records`,
++          align: 'right',
++          Cell: ({ item }) => (
++            <>
++              {isDefined(item.totalCount) ? formatNumber(item.totalCount) : ''}
++            </>
++          ),
++        },
++      ]}
++      gridAutoColumns="1fr 120px"
++    />
++  );
++};
+diff --git a/packages/twenty-front/src/pages/my-work/MyWorkPage.tsx b/packages/twenty-front/src/pages/my-work/MyWorkPage.tsx
+new file mode 100644
+index 00000000..2a702f66
+--- /dev/null
++++ b/packages/twenty-front/src/pages/my-work/MyWorkPage.tsx
+@@ -0,0 +1,49 @@
++import { MyWorkOpenTasksSection } from '@/my-work/components/MyWorkOpenTasksSection';
++import { MyWorkRecentPeopleSection } from '@/my-work/components/MyWorkRecentPeopleSection';
++import { currentWorkspaceMemberState } from '@/auth/states/currentWorkspaceMemberState';
++import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
++import { PageCardHeader } from '@/ui/layout/page/components/PageCardHeader';
++import { PageCardLayout } from '@/ui/layout/page/components/PageCardLayout';
++import { PageTitle } from '@/ui/utilities/page-title/components/PageTitle';
++import { styled } from '@linaria/react';
++import { useLingui } from '@lingui/react/macro';
++import { IconListCheck } from 'twenty-ui/icon';
++import { themeCssVariables, useTheme } from 'twenty-ui/theme';
++
++const StyledContent = styled.div`
++  box-sizing: border-box;
++  display: flex;
++  flex: 1;
++  flex-direction: column;
++  gap: ${themeCssVariables.spacing[8]};
++  min-height: 0;
++  overflow-y: auto;
++  padding: ${themeCssVariables.spacing[8]};
++`;
++
++export const MyWorkPage = () => {
++  const { t } = useLingui();
++  const theme = useTheme();
++  const currentWorkspaceMember = useAtomStateValue(currentWorkspaceMemberState);
++
++  return (
++    <>
++      <PageTitle title={t`My work`} />
++      <PageCardLayout
++        header={
++          <PageCardHeader
++            icon={<IconListCheck size={theme.icon.size.md} />}
++            title={t`My work`}
++          />
++        }
++      >
++        <StyledContent>
++          <MyWorkOpenTasksSection
++            workspaceMemberId={currentWorkspaceMember?.id}
++          />
++          <MyWorkRecentPeopleSection />
++        </StyledContent>
++      </PageCardLayout>
++    </>
++  );
++};
+diff --git a/packages/twenty-front/src/pages/settings/usage/SettingsWorkspaceUsage.tsx b/packages/twenty-front/src/pages/settings/usage/SettingsWorkspaceUsage.tsx
+new file mode 100644
+index 00000000..d1a46dcb
+--- /dev/null
++++ b/packages/twenty-front/src/pages/settings/usage/SettingsWorkspaceUsage.tsx
+@@ -0,0 +1,29 @@
++import { SettingsPageContainer } from '@/settings/components/SettingsPageContainer';
++import { SettingsPageLayout } from '@/settings/components/layout/SettingsPageLayout';
++import { SettingsWorkspaceUsageMembersSection } from '@/settings/usage/components/SettingsWorkspaceUsageMembersSection';
++import { SettingsWorkspaceUsageRecordsSection } from '@/settings/usage/components/SettingsWorkspaceUsageRecordsSection';
++import { useLingui } from '@lingui/react/macro';
++import { SettingsPath } from 'twenty-shared/types';
++import { getSettingsPath } from 'twenty-shared/utils';
++
++export const SettingsWorkspaceUsage = () => {
++  const { t } = useLingui();
++
++  return (
++    <SettingsPageLayout
++      title={t`Usage`}
++      links={[
++        {
++          children: t`Workspace`,
++          href: getSettingsPath(SettingsPath.General),
++        },
++        { children: t`Usage` },
++      ]}
++    >
++      <SettingsPageContainer>
++        <SettingsWorkspaceUsageRecordsSection />
++        <SettingsWorkspaceUsageMembersSection />
++      </SettingsPageContainer>
++    </SettingsPageLayout>
++  );
++};

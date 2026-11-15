@@ -1,0 +1,10 @@
+**1. Export to CSV: already in the app, no change.** Select people, open the ⋮ menu, and choose "Export People". I ran it in the headless browser with two rows selected, and the downloaded CSV contained exactly those two people. The item is hidden in the ⋮ menu rather than on the selection bar, and the file is named `person.csv`, which is existing behaviour I left alone. If you want it more visible, the change would be adding it to the selection bar.
+
+**2. Copy an address: changed.** In `packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts`, addresses now get the same hover copy button as emails and links. It copies the address as displayed and shows the toast "Address copied to clipboard". Both the companies list and the record page get it, since both already use this hook. I added `packages/twenty-front/src/modules/object-record/record-field/ui/hooks/__tests__/useGetSecondaryFieldButton.test.tsx` to cover the button, the copied text and the empty case. In the unmodified app, hovering an email shows copy and edit icons, and hovering an address shows only the edit icon.
+
+**3. Record count near the title: already there, no change.** The count is already shown next to the title, as "All People · 5" and "All Companies · 5" in the view bar (`packages/twenty-front/src/modules/views/view-picker/components/ViewPickerDropdown.tsx`). I didn't add a second count to the title bar, because `DESIGN.md` says to show each piece of information once. If you want it in the title bar, I would move it there rather than duplicate it. That is a decision for you.
+
+**Not verified:**
+- I could not run jest, lint or the typechecker, because the checkout has no `node_modules` and I was not allowed to install packages. The new test and the hook change are checked by reading only.
+- The address copy change has not been seen in the browser, since the local app is the unmodified copy.
+- I did not commit anything, and I did not touch the translation catalogs.

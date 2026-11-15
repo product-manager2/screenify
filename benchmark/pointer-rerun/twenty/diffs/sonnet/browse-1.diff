@@ -1,0 +1,54 @@
+diff --git a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+index d3a61892..341090ea 100644
+--- a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
++++ b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+@@ -1,13 +1,16 @@
+ import { useOpenEmailInAppOrFallback } from '@/activities/emails/hooks/useOpenEmailInAppOrFallback';
+ import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
+ import {
++  type FieldAddressValue,
+   type FieldEmailsValue,
+   type FieldLinksValue,
+   type FieldPhonesValue,
+ } from '@/object-record/record-field/ui/types/FieldMetadata';
++import { isFieldAddress } from '@/object-record/record-field/ui/types/guards/isFieldAddress';
+ import { isFieldEmails } from '@/object-record/record-field/ui/types/guards/isFieldEmails';
+ import { isFieldLinks } from '@/object-record/record-field/ui/types/guards/isFieldLinks';
+ import { isFieldPhones } from '@/object-record/record-field/ui/types/guards/isFieldPhones';
++import { formatAddressDisplay } from '@/object-record/record-field/ui/utils/formatAddressDisplay';
+ import { useRecordFieldValue } from '@/object-record/record-store/hooks/useRecordFieldValue';
+ import { useContext } from 'react';
+ import { FieldMetadataSettingsOnClickAction } from 'twenty-shared/types';
+@@ -27,9 +30,31 @@ export const useGetSecondaryFieldButton = () => {
+   const { openEmail } = useOpenEmailInAppOrFallback();
+ 
+   const fieldValue = useRecordFieldValue<
+-    FieldPhonesValue | FieldEmailsValue | FieldLinksValue | undefined
++    | FieldPhonesValue
++    | FieldEmailsValue
++    | FieldLinksValue
++    | FieldAddressValue
++    | undefined
+   >(recordId, fieldDefinition.metadata.fieldName, fieldDefinition);
+ 
++  if (isFieldAddress(fieldDefinition) && isDefined(fieldValue)) {
++    const settings = fieldDefinition.metadata.settings;
++    const address = formatAddressDisplay(
++      fieldValue as FieldAddressValue,
++      settings && 'subFields' in settings ? settings.subFields : undefined,
++    );
++
++    return [
++      {
++        onClick: () => {
++          copyToClipboard(address, t`Address copied to clipboard`);
++        },
++        Icon: IconCopy,
++        ariaLabel: t`Copy`,
++      },
++    ];
++  }
++
+   if (
+     (!isFieldPhones(fieldDefinition) &&
+       !isFieldLinks(fieldDefinition) &&

@@ -1,0 +1,9 @@
+I made two of the three changes in `twenty-front`. The CSV export already exists, so I left it alone. Nothing was built, run or tested, because the checkout can't be built here.
+
+1. **Export to CSV:** no change. In the unmodified app at localhost:3020, selecting people on the People list and opening the ⋮ menu shows "Export People". It is not pinned in the header. Server-side command definitions control whether it's pinned, and the server stays as it is. It is not a new feature, so I didn't add a duplicate.
+
+2. **Copy an address:** `record-field/ui/hooks/useGetSecondaryFieldButton.ts` now returns a copy button for address fields. The record-table cell and the record page's inline field both use this hook, so addresses get the same hover button as emails, phones and links on the companies list and on a company's page. It copies the address as displayed, honoring the field's configured subfields, and shows an "Address copied to clipboard" toast. I didn't add the new toast string to the translation catalogs, per the repo rule.
+
+3. **Record count:** `RecordIndexPageHeader.tsx` now calls the existing `useGetRecordIndexTotalCount`, the same hook behind the "· 5" in the view picker. It passes the count to `RecordIndexPageHeaderTitle.tsx`, which shows a `Badge` next to the title, as DESIGN.md prescribes for counts. The count follows the active filters. While rows are selected, the header keeps its "People -> N selected" text without the badge. I added an optional `totalCount` prop rather than calling the hook inside the title, because that component is also used by `CoreObjectIndexPageLayout` and `AiChatInboxViewHeading`, which have no view context.
+
+I added no tests, and I didn't check either UI change in the browser, since the running app is the unmodified version.

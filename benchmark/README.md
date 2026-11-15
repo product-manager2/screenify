@@ -96,6 +96,29 @@ Side-by-side images use, per arm and screen, the run with the median score
 ([`redraw/side-by-side/`](redraw/side-by-side/)); all eighteen renders and their HTML are in
 [`redraw/renders/`](redraw/renders/) and [`redraw/pages/`](redraw/pages/).
 
+## Test 4: the new pointer, on a small and a large app
+
+After the library pointer moved to the top of `AGENTS.md` with clearer wording, Haiku runs were
+graded blind on three feature requests in Memos and in Twenty (a large CRM). With the new pointer
+every library run opened the index before editing (none did with the old one), but only one in six
+opened a screenshot. Memos was a tie (code only 47/51, old pointer 49/51, new pointer 48/51);
+on Twenty the library arm scored 48/48, browsing the app 47/48 at twice the cost, and code only
+42/48. Three runs per arm; details, caveats and every run in [`pointer-rerun/`](pointer-rerun/).
+
+A second round repeated it with Sonnet 5.5 (effort medium) as the coding model: all three arms tied
+on both apps (Memos 50, 49 and 50 of 51; Twenty 47 of 48 each), with the library costing about a
+quarter more per run. Wording that tells agents to open the image got Haiku to open screenshots in
+4 of 6 runs, but did not change what it built.
+
+## Test 5: two new screens on a large app
+
+Larger changes, where drift should show: Haiku builds two new Twenty pages (a Settings page and a
+"My work" page) that must fit the app at desktop and phone width. Five runs per arm, a blind
+checklist and a blind screenshots-only ranking. A tie: checklist 77/80 code only, 73/80 with the
+library; fit rank 5.65 vs 5.35 (5.5 is chance). Every library run opened two to four screenshots
+before editing, but of the frame it sat beside, not of the empty state the runs got wrong. Details
+in [`large-screens/`](large-screens/).
+
 ## Method
 
 - **App.** Memos v26.11.0 (MIT), started with

@@ -1,0 +1,141 @@
+diff --git a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+index d3a61892..4b58b609 100644
+--- a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
++++ b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+@@ -1,10 +1,13 @@
+ import { useOpenEmailInAppOrFallback } from '@/activities/emails/hooks/useOpenEmailInAppOrFallback';
+ import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
+ import {
++  type FieldAddressValue,
+   type FieldEmailsValue,
+   type FieldLinksValue,
+   type FieldPhonesValue,
+ } from '@/object-record/record-field/ui/types/FieldMetadata';
++import { isFieldAddress } from '@/object-record/record-field/ui/types/guards/isFieldAddress';
++import { formatAddressDisplay } from '@/object-record/record-field/ui/utils/formatAddressDisplay';
+ import { isFieldEmails } from '@/object-record/record-field/ui/types/guards/isFieldEmails';
+ import { isFieldLinks } from '@/object-record/record-field/ui/types/guards/isFieldLinks';
+ import { isFieldPhones } from '@/object-record/record-field/ui/types/guards/isFieldPhones';
+@@ -27,12 +30,17 @@ export const useGetSecondaryFieldButton = () => {
+   const { openEmail } = useOpenEmailInAppOrFallback();
+ 
+   const fieldValue = useRecordFieldValue<
+-    FieldPhonesValue | FieldEmailsValue | FieldLinksValue | undefined
++    | FieldPhonesValue
++    | FieldEmailsValue
++    | FieldLinksValue
++    | FieldAddressValue
++    | undefined
+   >(recordId, fieldDefinition.metadata.fieldName, fieldDefinition);
+ 
+   if (
+     (!isFieldPhones(fieldDefinition) &&
+       !isFieldLinks(fieldDefinition) &&
++      !isFieldAddress(fieldDefinition) &&
+       !isEmailField) ||
+     !isDefined(fieldValue)
+   ) {
+@@ -94,6 +102,19 @@ export const useGetSecondaryFieldButton = () => {
+     };
+   }
+ 
++  if (isFieldAddress(fieldDefinition)) {
++    const settings = fieldDefinition.metadata.settings;
++    const subFields =
++      settings && 'subFields' in settings ? settings.subFields : undefined;
++    const address = formatAddressDisplay(
++      fieldValue as FieldAddressValue,
++      subFields,
++    );
++    copyOnClick = () => {
++      copyToClipboard(address, t`Address copied to clipboard`);
++    };
++  }
++
+   const onClickByAction: Record<
+     FieldMetadataSettingsOnClickAction,
+     () => void
+diff --git a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
+index fabde6ce..af855901 100644
+--- a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
++++ b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
+@@ -6,6 +6,7 @@ import { useFilteredObjectMetadataItems } from '@/object-metadata/hooks/useFilte
+ import { RecordIndexPageHeaderTitle } from '@/object-record/record-index/components/RecordIndexPageHeaderTitle';
+ import { RecordIndexPageHeaderIcon } from '@/object-record/record-index/components/RecordIndexPageHeaderIcon';
+ import { useRecordIndexContextOrThrow } from '@/object-record/record-index/contexts/RecordIndexContext';
++import { totalNumberOfRowsComponentState } from '@/object-record/record-table/virtualization/states/totalNumberOfRowsComponentState';
+ import { SidePanelPageTitleSyncEffect } from '@/side-panel/components/SidePanelPageTitleSyncEffect';
+ import { SidePanelToggleButton } from '@/side-panel/components/SidePanelToggleButton';
+ import { PageCardHeader } from '@/ui/layout/page/components/PageCardHeader';
+@@ -24,7 +25,12 @@ export const RecordIndexPageHeader = () => {
+     contextStoreNumberOfSelectedRecordsComponentState,
+   );
+ 
+-  const { objectNamePlural } = useRecordIndexContextOrThrow();
++  const { objectNamePlural, recordIndexId } = useRecordIndexContextOrThrow();
++
++  const totalNumberOfRows = useAtomComponentStateValue(
++    totalNumberOfRowsComponentState,
++    recordIndexId,
++  );
+ 
+   const objectMetadataItem =
+     findObjectMetadataItemByNamePlural(objectNamePlural);
+@@ -49,6 +55,7 @@ export const RecordIndexPageHeader = () => {
+           <RecordIndexPageHeaderTitle
+             label={label}
+             numberOfSelectedRecords={contextStoreNumberOfSelectedRecords}
++            totalNumberOfRecords={totalNumberOfRows}
+           />
+         }
+         actionButton={
+diff --git a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
+index a2b1dbbc..f368ec53 100644
+--- a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
++++ b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
+@@ -1,5 +1,6 @@
+ import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
+ import { styled } from '@linaria/react';
++import { isDefined } from 'twenty-shared/utils';
+ import { themeCssVariables } from 'twenty-ui/theme';
+ import { useLingui } from '@lingui/react/macro';
+ 
+@@ -19,20 +20,37 @@ const StyledSelectedRecordsCount = styled.div`
+   padding-left: ${themeCssVariables.spacing['0.5']};
+ `;
+ 
++const StyledTotalRecordsCount = styled.div`
++  color: ${themeCssVariables.font.color.tertiary};
++`;
++
+ type RecordIndexPageHeaderTitleProps = {
+   label: string;
+   numberOfSelectedRecords: number;
++  totalNumberOfRecords?: number | null;
+ };
+ 
+ export const RecordIndexPageHeaderTitle = ({
+   label,
+   numberOfSelectedRecords,
++  totalNumberOfRecords,
+ }: RecordIndexPageHeaderTitleProps) => {
+   const { t } = useLingui();
+   const { formatNumber } = useNumberFormat();
+ 
+   if (numberOfSelectedRecords === 0) {
+-    return <>{label}</>;
++    if (!isDefined(totalNumberOfRecords)) {
++      return <>{label}</>;
++    }
++
++    return (
++      <StyledTitleWithSelectedRecords>
++        <StyledTitle>{label}</StyledTitle>
++        <StyledTotalRecordsCount>
++          {formatNumber(totalNumberOfRecords)}
++        </StyledTotalRecordsCount>
++      </StyledTitleWithSelectedRecords>
++    );
+   }
+ 
+   return (

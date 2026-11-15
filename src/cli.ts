@@ -54,7 +54,8 @@ Output lives in screenify-out/ (INDEX.md first). Notices go to stderr; --json pr
 const COMMAND_HELP: Record<string, string> = {
   init: `screenify init [--no-skills] [--json]
   Creates the shared store and the screenify-out link, git-ignores it, writes config.json, installs the
-  skill and agents for Claude Code and Codex, and adds a pointer line to CLAUDE.md / AGENTS.md. Idempotent.`,
+  skill and agents for Claude Code and Codex (the skill also into the repo's .claude/skills and
+  .agents/skills), and puts a pointer line under the first heading of CLAUDE.md / AGENTS.md. Idempotent.`,
   discover: `screenify discover [--json]
   Prints the discovery agent's brief: what to read, the plan JSON shape, the sources rule. When a plan
   exists, also the files changed since its commit and the items that list them.`,

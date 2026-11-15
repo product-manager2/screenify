@@ -1,0 +1,86 @@
+{
+ "grader": "a separate Claude Opus 5.5 agent, one pass over all twelve (nine Sonnet runs, three Haiku image-wording runs) under shuffled names, with each run's diff, its final reply (sentences naming the library or a browser blanked) and screenshots of its built app",
+ "checklist": "twenty/checklist.md",
+ "runs": {
+  "sonnet/code-1": {
+   "blind_name": "entry-D",
+   "total": 16,
+   "lost": {},
+   "notes": "Minimal correct change: address copy only; export and count correctly identified as existing."
+  },
+  "sonnet/code-2": {
+   "blind_name": "entry-G",
+   "total": 16,
+   "lost": {},
+   "notes": "Address case reuses the existing copyOnClick/onClickByAction path."
+  },
+  "sonnet/code-3": {
+   "blind_name": "entry-B",
+   "total": 15,
+   "lost": {
+    "3a": "Adds a new useFindManyRecords limit:1 count query instead of reusing useGetRecordIndexTotalCount."
+   },
+   "notes": "Extra count query on every index page."
+  },
+  "sonnet/lib-1": {
+   "blind_name": "entry-L",
+   "total": 16,
+   "lost": {},
+   "notes": "Kanban/calendar views get no count (reply says so)."
+  },
+  "sonnet/lib-2": {
+   "blind_name": "entry-E",
+   "total": 15,
+   "lost": {
+    "3a": "Adds a new useFindManyRecords count query (reply justifies it) rather than reusing the view picker's total."
+   },
+   "notes": "Extra count query."
+  },
+  "sonnet/lib-3": {
+   "blind_name": "entry-M",
+   "total": 16,
+   "lost": {},
+   "notes": "Minimal correct change: address copy only; export and count correctly identified as existing."
+  },
+  "sonnet/browse-1": {
+   "blind_name": "entry-C",
+   "total": 16,
+   "lost": {},
+   "notes": "Minimal correct change: address copy only; export and count correctly identified as existing."
+  },
+  "sonnet/browse-2": {
+   "blind_name": "entry-H",
+   "total": 15,
+   "lost": {
+    "3e": "Renders the count in a grey Badge pill, not the tertiary text style of the neighbouring 'N selected' count (visible in screenshots)."
+   },
+   "notes": ""
+  },
+  "sonnet/browse-3": {
+   "blind_name": "entry-K",
+   "total": 16,
+   "lost": {},
+   "notes": "Minimal correct change: address copy only; export and count correctly identified as existing."
+  },
+  "img-1": {
+   "blind_name": "entry-F",
+   "total": 15,
+   "lost": {
+    "3a": "Adds a new useFindManyRecords limit:1 count query."
+   },
+   "notes": "Removed the early return so other title users render through the styled wrapper; minor."
+  },
+  "img-2": {
+   "blind_name": "entry-A",
+   "total": 16,
+   "lost": {},
+   "notes": "Count now appears twice (title and view picker), which the reply acknowledges."
+  },
+  "img-3": {
+   "blind_name": "entry-J",
+   "total": 16,
+   "lost": {},
+   "notes": "Minimal correct change: address copy only; export and count correctly identified as existing."
+  }
+ }
+}

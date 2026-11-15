@@ -1,0 +1,67 @@
+{
+ "grader": "a separate Claude Opus 5.5 agent, one pass over all nine under shuffled names, with each run's diff, its final reply (sentences naming the library blanked) and screenshots of its built app",
+ "checklist": "the same 17-item checklist as the Sonnet test",
+ "runs": {
+  "code-only-1": {
+   "blind_name": "entry-F",
+   "total": 15,
+   "lost": {
+    "2d": "Duplicate is shown to any signed-in user, read-only viewers and comments included, unlike Edit.",
+    "3d": "The Edited label is text-2xs, smaller than the time."
+   }
+  },
+  "code-only-2": {
+   "blind_name": "entry-G",
+   "total": 15,
+   "lost": {
+    "2c": "Uses t('common.duplicate') without adding the key to en.json; the menu shows the raw 'common.duplicate'.",
+    "3f": "The Edited mark shows regardless of time basis, doubling up with 'Last updated at'."
+   }
+  },
+  "code-only-3": {
+   "blind_name": "entry-J",
+   "total": 17,
+   "lost": {}
+  },
+  "old-pointer-1": {
+   "blind_name": "entry-D",
+   "total": 16,
+   "lost": {
+    "3d": "The Edited label is a new pill badge (rounded-full bg-muted, font-medium, text-2xs), not styled like the muted time."
+   }
+  },
+  "old-pointer-2": {
+   "blind_name": "entry-C",
+   "total": 16,
+   "lost": {
+    "3d": "The Edited mark is text-2xs, smaller than the neighbouring time."
+   }
+  },
+  "old-pointer-3": {
+   "blind_name": "entry-E",
+   "total": 17,
+   "lost": {}
+  },
+  "new-pointer-1": {
+   "blind_name": "entry-A",
+   "total": 16,
+   "lost": {
+    "3d": "The Edited label uses text-2xs, visibly smaller than the neighbouring time."
+   }
+  },
+  "new-pointer-2": {
+   "blind_name": "entry-B",
+   "total": 16,
+   "lost": {
+    "3d": "The Edited label is text-2xs, smaller than the time."
+   }
+  },
+  "new-pointer-3": {
+   "blind_name": "entry-H",
+   "total": 16,
+   "lost": {
+    "3d": "The edited text is text-2xs, visibly smaller than the neighbouring time."
+   }
+  }
+ }
+}

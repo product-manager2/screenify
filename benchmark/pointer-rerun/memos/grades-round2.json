@@ -1,0 +1,93 @@
+{
+ "grader": "a separate Claude Opus 5.5 agent, one pass over all twelve (nine Sonnet runs, three Haiku image-wording runs) under shuffled names, with each run's diff, its final reply (sentences naming the library or a browser blanked) and screenshots of its built app",
+ "checklist": "memos/checklist.md",
+ "runs": {
+  "sonnet/code-1": {
+   "blind_name": "entry-J",
+   "total": 17,
+   "lost": {},
+   "notes": "Duplicate after Copy, hidden for comments."
+  },
+  "sonnet/code-2": {
+   "blind_name": "entry-F",
+   "total": 16,
+   "lost": {
+    "X": "Reformats an unrelated line ('spaceMetadata =showSpace'), which the project formatter rejects."
+   },
+   "notes": "Label key under common.duplicate (added). Stray formatting glitch in MemoHeader."
+  },
+  "sonnet/code-3": {
+   "blind_name": "entry-A",
+   "total": 17,
+   "lost": {},
+   "notes": "Duplicate between Pin and Archive; '(edited)' also hidden on archived memos."
+  },
+  "sonnet/lib-1": {
+   "blind_name": "entry-L",
+   "total": 15,
+   "lost": {
+    "3d": "Uses text-2xs, smaller than the neighbouring time.",
+    "X": "Reformats an unrelated line ('spaceMetadata =showSpace'), which the project formatter rejects."
+   },
+   "notes": "Duplicate between Pin and Archive; stray formatting glitch in MemoHeader; message key out of alphabetical order."
+  },
+  "sonnet/lib-2": {
+   "blind_name": "entry-G",
+   "total": 17,
+   "lost": {},
+   "notes": "Duplicate above Pin; New badge on copy."
+  },
+  "sonnet/lib-3": {
+   "blind_name": "entry-C",
+   "total": 17,
+   "lost": {},
+   "notes": "Duplicate after Archive; marks the copy with the New badge."
+  },
+  "sonnet/browse-1": {
+   "blind_name": "entry-H",
+   "total": 16,
+   "lost": {
+    "X": "Changes an unrelated en.json line ('\"fill-all\":\"Please...') breaking formatting."
+   },
+   "notes": "Duplicate in Edit group; en.json keys inserted out of order and an unrelated line reformatted."
+  },
+  "sonnet/browse-2": {
+   "blind_name": "entry-M",
+   "total": 17,
+   "lost": {},
+   "notes": "Duplicate above Pin; en.json keys out of alphabetical order (acknowledged in reply)."
+  },
+  "sonnet/browse-3": {
+   "blind_name": "entry-B",
+   "total": 17,
+   "lost": {},
+   "notes": "Duplicate after Edit; also duplicates comments under the same parent."
+  },
+  "img-1": {
+   "blind_name": "entry-K",
+   "total": 15,
+   "lost": {
+    "2c": "Uses t('common.duplicate') which is not in en.json; the menu shows the raw key 'common.duplicate'.",
+    "3d": "EditedBadge uses text-2xs leading-none, smaller than the time."
+   },
+   "notes": "Only entry that changed Copy (moved Copy Content to top level). Reply falsely claims common.duplicate already exists; screenshot shows raw key."
+  },
+  "img-2": {
+   "blind_name": "entry-D",
+   "total": 15,
+   "lost": {
+    "3f": "isEdited shown regardless of isDisplayingUpdatedTime, so it doubles up with 'Last updated at'.",
+    "3d": "EditedBadge uses text-2xs, visibly smaller than the neighbouring time."
+   },
+   "notes": "Duplicate after Copy; isEdited moved into useMemoViewDerived but label not suppressed in update-time basis."
+  },
+  "img-3": {
+   "blind_name": "entry-E",
+   "total": 16,
+   "lost": {
+    "3d": "EditedLabel uses text-2xs, smaller than the neighbouring time (text-ui)."
+   },
+   "notes": "Duplicate after Copy, hidden for comments."
+  }
+ }
+}

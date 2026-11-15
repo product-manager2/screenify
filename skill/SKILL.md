@@ -1,9 +1,42 @@
 ---
 name: screenify
-description: Build and maintain an organised screenshot library of this repo's app (every screen, state and small flow, with text sidecars and captioned flow boards) using the screenify CLI. Use when the user asks for app screenshots, a screen inventory, flow boards, to see what a screen looks like, or to refresh stale screenshots.
+description: Use before adding, changing, reviewing, designing or describing any screen, dialog, menu or state of this repo's app - open its existing screenshots in screenify-out/ first, so what you build matches what the app shows. Also builds and refreshes that screenshot library (every screen, state and small flow, with text sidecars and captioned flow boards) with the screenify CLI when the user asks for app screenshots, a screen inventory, flow boards, or to refresh stale screenshots.
 ---
 
 # Screenify
+
+## Before you change a screen
+
+When `screenify-out/INDEX.md` exists, open the library **before** you add or change a screen,
+dialog, menu or state, not after:
+
+1. Find the nearest existing screens and flows: grep the sidecars for a file you are about to edit
+   (`grep -rl "src/components/Menu" screenify-out/screens screenify-out/flows --include=*.md`; each
+   sidecar lists the source files that shape its image), or for visible text, or browse INDEX.md
+   by feature.
+2. Open the images. Take **what is shown** from them: labels, order, which actions sit together,
+   what an empty, edited or error state looks like, what already exists that you could reuse.
+   A sidecar describes a screen in words; it cannot show size, weight, colour, spacing or how
+   steps connect. Open the `.png` itself (not only its sidecar) when your change:
+   - adds or restyles anything visible: match what sits next to it;
+   - touches an empty, error, loading or other edge state: open that state's capture to see what
+     the app shows today;
+   - changes a step of a flow: open the flow board to see the steps before and after it.
+3. Take **how it is built** from the code: components, icons, styles, translation keys. A
+   screenshot shows an icon without naming it; the code names it.
+4. If a capture is flagged STALE, the code changed since it was taken: trust the code where they
+   disagree, and say so.
+
+### Where things are
+
+- `screenify-out/INDEX.md`: start here. Features, screens, flows, paths, commit, stale marks.
+- `screens/<platform>/<feature>/<screen>/<screen>--<state>--<viewport>--<theme>.png` + `.md` sidecar,
+  e.g. `screens/web/tasks/task-list/task-list--empty--mobile-390x844--app-default.png` (theme is
+  `light`/`dark` only when the recipe forced it).
+- `flows/<platform>/<feature>/<flow>--<viewport>--<theme>.png` (board) + `.md`, frames in `--frames/`.
+- To find a screen by its text: `grep -rl "Button label" screenify-out/screens screenify-out/flows --include=*.md`.
+
+## Building and refreshing the library
 
 Screenify keeps a git-ignored library of this app's screens in `screenify-out/` (shared by every
 worktree of the repo). Two steps do the work, each in its own agent on a model sized for it:
@@ -28,7 +61,7 @@ Your own turn only orchestrates: set up, hand each step to its agent, ask the us
 question and, after capture, one batched set of environment suggestions, then check the result. Do
 not do discovery or capture yourself.
 
-## Which agent does what
+### Which agent does what
 
 | Step | Claude Code | Codex |
 | --- | --- | --- |
@@ -42,7 +75,7 @@ instructions: `npx screenify discover` prints the discovery brief; the capture i
 
 Subagents cannot ask the user anything, which is why the questions below are yours.
 
-## Steps
+### Steps
 
 1. **Set up.** `npx screenify init` (idempotent). It links `screenify-out/`, git-ignores it and
    installs this skill and the agents.
@@ -74,7 +107,7 @@ Subagents cannot ask the user anything, which is why the questions below are you
    `npx screenify refresh` in cron (re-captures only what changed, starts the app if needed, exits
    non-zero listing failed recipes).
 
-## Rules
+### Rules
 
 - **Headless only.** Never open a visible browser window or any GUI app.
 - **No secrets in recipes**; recipes use `${ENV_VAR}`, including for one-time sign-in links.
@@ -86,12 +119,3 @@ Subagents cannot ask the user anything, which is why the questions below are you
 - **Writes need a disposable database.** Recipes that create, edit or delete data run only after the
   capture agent confirmed the database is local or disposable.
 - Do not edit images, the manifest, the plan or INDEX.md by hand; the CLI owns them.
-
-## Reading the library
-
-- `screenify-out/INDEX.md`: start here. Features, screens, flows, paths, commit, stale marks.
-- `screens/<platform>/<feature>/<screen>/<screen>--<state>--<viewport>--<theme>.png` + `.md` sidecar,
-  e.g. `screens/web/tasks/task-list/task-list--empty--mobile-390x844--app-default.png` (theme is
-  `light`/`dark` only when the recipe forced it).
-- `flows/<platform>/<feature>/<flow>--<viewport>--<theme>.png` (board) + `.md`, frames in `--frames/`.
-- To find a screen by its text: `grep -rl "Button label" screenify-out/screens screenify-out/flows --include=*.md`.

@@ -1,0 +1,147 @@
+diff --git a/web/src/components/MemoActionMenu/MemoActionMenu.tsx b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+index 035647c..0a4a7cd 100644
+--- a/web/src/components/MemoActionMenu/MemoActionMenu.tsx
++++ b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+@@ -6,6 +6,7 @@ import {
+   BookmarkPlusIcon,
+   CheckCheckIcon,
+   CopyIcon,
++  CopyPlusIcon,
+   Edit3Icon,
+   FileTextIcon,
+   LinkIcon,
+@@ -62,6 +63,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemoClick,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+@@ -159,6 +161,10 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+         {!isComment && (
+           <>
+             <DropdownMenuSeparator />
++            <DropdownMenuItem onClick={handleDuplicateMemoClick}>
++              <CopyPlusIcon />
++              {t("memo.duplicate")}
++            </DropdownMenuItem>
+             <DropdownMenuItem onClick={handleTogglePinMemoBtnClick}>
+               {memo.pinned ? <BookmarkMinusIcon /> : <BookmarkPlusIcon />}
+               {memo.pinned ? t("common.unpin") : t("common.pin")}
+diff --git a/web/src/components/MemoActionMenu/hooks.ts b/web/src/components/MemoActionMenu/hooks.ts
+index 38344a6..b368da4 100644
+--- a/web/src/components/MemoActionMenu/hooks.ts
++++ b/web/src/components/MemoActionMenu/hooks.ts
+@@ -1,17 +1,19 @@
++import { create } from "@bufbuild/protobuf";
+ import { useQueryClient } from "@tanstack/react-query";
+ import copy from "copy-to-clipboard";
+ import { useCallback } from "react";
+ import toast from "react-hot-toast";
+ import { useLocation } from "react-router-dom";
+ import { useInstance } from "@/contexts/InstanceContext";
+-import { memoKeys, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
++import { useNewMemo } from "@/contexts/NewMemoContext";
++import { memoKeys, useCreateMemo, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
+ import useNavigateTo from "@/hooks/useNavigateTo";
+ import { userKeys } from "@/hooks/useUserQueries";
+ import { handleError } from "@/lib/error";
+ import { extractMemoIdFromName } from "@/lib/resource-names";
+ import { ROUTES } from "@/router/routes";
+ import { State } from "@/types/proto/api/common_pb";
+-import type { Memo } from "@/types/proto/api/memo_service_pb";
++import { type Memo, MemoSchema } from "@/types/proto/api/memo_service_pb";
+ import { useTranslate } from "@/utils/i18n";
+ import { checkAllTasks, uncheckAllTasks } from "@/utils/markdown-task-actions";
+ import { isMemoDetailPath } from "../MemoView/navigation";
+@@ -30,6 +32,8 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+   const queryClient = useQueryClient();
+   const { profile } = useInstance();
+   const { mutateAsync: updateMemo } = useUpdateMemo();
++  const { mutateAsync: createMemo } = useCreateMemo();
++  const { markNewMemo } = useNewMemo();
+   const { mutateAsync: deleteMemo } = useDeleteMemo();
+   const isInMemoDetailPage = isMemoDetailPath(location.pathname, memo.name);
+ 
+@@ -125,6 +129,18 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     toast.success(t("message.succeed-copy-content"));
+   }, [memo.content, t]);
+ 
++  const handleDuplicateMemoClick = useCallback(async () => {
++    try {
++      const duplicate = await createMemo({
++        memo: create(MemoSchema, { content: memo.content, visibility: memo.visibility, space: memo.space }),
++      });
++      markNewMemo(duplicate.name);
++      toast.success(t("message.duplicated-successfully"));
++    } catch (error: unknown) {
++      handleError(error, toast.error, { context: "Duplicate memo", fallbackMessage: "An error occurred" });
++    }
++  }, [memo.content, memo.visibility, memo.space, t, createMemo, markNewMemo]);
++
+   const handleCheckAllTaskListItemsClick = useCallback(async () => {
+     await updateMemoContent(checkAllTasks(memo.content), "Check memo task list items");
+   }, [memo.content, updateMemoContent]);
+@@ -162,6 +178,7 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemoClick,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+diff --git a/web/src/components/MemoView/components/MemoHeader.tsx b/web/src/components/MemoView/components/MemoHeader.tsx
+index a4b73fb..f55ff29 100644
+--- a/web/src/components/MemoView/components/MemoHeader.tsx
++++ b/web/src/components/MemoView/components/MemoHeader.tsx
+@@ -57,6 +57,8 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+   const spaceMetadata = showSpace && memo.space ? <MemoSpaceBadge spaceName={memo.space} /> : null;
+   const showsCreator = Boolean(showCreator && creator);
+   const isNew = memo.name === newMemoName;
++  // When the time already reads "Last updated at", the label would repeat it.
++  const isEdited = !isDisplayingUpdatedTime && !!createTime && !!updateTime && updateTime.getTime() > createTime.getTime();
+ 
+   // While the card edits in place, the header keeps only identity. The time, visibility
+   // and Space show once, in their editable form, in the session below (its timestamp row
+@@ -90,6 +92,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+             isCurrentPage={isMemoDetailPath(location.pathname, memo.name)}
+           />
+           {spaceMetadata}
++          {isEdited && <EditedLabel />}
+         </div>
+         {isNew && <NewBadge />}
+       </div>
+@@ -117,6 +120,11 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+   );
+ };
+ 
++const EditedLabel = () => {
++  const t = useTranslate();
++  return <span className="shrink-0 whitespace-nowrap text-ui text-muted-foreground select-none">{t("memo.edited")}</span>;
++};
++
+ const NewBadge = () => {
+   const t = useTranslate();
+   return (
+diff --git a/web/src/locales/en.json b/web/src/locales/en.json
+index 9e9eeca..eac4467 100644
+--- a/web/src/locales/en.json
++++ b/web/src/locales/en.json
+@@ -380,6 +380,8 @@
+     "parent-unavailable-description": "It may have been deleted or you may no longer have access.",
+     "moved": "Memo moved",
+     "back-to": "Back to {{source}}",
++    "duplicate": "Duplicate",
++    "edited": "edited",
+     "click-to-show-sensitive-content": "Click to show sensitive content",
+     "comment": {
+       "self": "Comments",
+@@ -466,6 +468,7 @@
+   },
+   "message": {
+     "archived-successfully": "Archived successfully",
++    "duplicated-successfully": "Memo duplicated",
+     "copied": "Copied",
+     "deleted-successfully": "Memo deleted successfully",
+     "description-is-required": "Description is required",

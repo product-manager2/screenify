@@ -1,0 +1,9 @@
+I made one change, for the address copy button. The other two requests are already in the product, so I left them alone.
+
+1. **Export to CSV: no change.** People already supports this. Selecting rows shows the more-actions button, and its export command (`ExportRecordsCommand.tsx`, which uses `useRecordIndexLazyFetchRecords.ts`) exports only the selected IDs when rows are ticked. It writes a CSV through `csvDownloader`. The command menu items come from workspace data, so I didn't hand-add a duplicate button. I haven't run the app, so I haven't seen it work.
+
+2. **Copy an address.** In `useGetSecondaryFieldButton.ts`, address fields now get a hover copy button, built the same way as the email, phone and link ones. Both the companies table cell and the company page's inline field use that hook. It copies the address as displayed, joining only the sub-fields the field is configured to show. It shows an "Address copied to clipboard" toast and no button when the address is empty. I didn't add a copy option to the field's click-action settings, since that is a settings and server-side change.
+
+3. **Record count: no change.** The view picker under the title already shows it, for example "All People · 5" and "All Companies · 5". This is `ViewPickerDropdown.tsx` using `useGetRecordIndexTotalCount`, and it matches the Companies and People screenshots. The table footer also has a Count all row. A second count in the header would repeat the first, and DESIGN.md says to show each piece of information once. If you want it in the breadcrumb itself, I can move it there.
+
+I haven't run typecheck, tests or the app. I also didn't add a test or touch any Lingui catalogs. The new "Address copied to clipboard" string will be picked up when the catalogs are next extracted.

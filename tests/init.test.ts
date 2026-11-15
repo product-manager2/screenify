@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { init, POINTER_LINE } from '../src/init.js';
+import { init, POINTER_LINE, withPointer } from '../src/init.js';
 import { isolateHome, tempRepo } from './helpers.js';
 
 describe('init', () => {
@@ -31,8 +31,12 @@ describe('init', () => {
         join(home, '.agents/skills/screenify/capture.md'),
         join(home, '.codex/agents/screenify.toml'),
         join(home, '.codex/screenify.config.toml'),
+        join(repo, '.claude/skills/screenify/SKILL.md'),
+        join(repo, '.agents/skills/screenify/SKILL.md'),
       ]),
     );
+    expect(readFileSync(join(repo, 'CLAUDE.md'), 'utf8')).toBe(`# Rules\n\n${POINTER_LINE}\n`);
+    expect(readFileSync(join(repo, '.claude/skills/screenify/SKILL.md'), 'utf8')).toBe(readFileSync(join(home, '.claude/skills/screenify/SKILL.md'), 'utf8'));
     expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toBe('node_modules\nscreenify-out\n');
     expect(readFileSync(join(repo, 'CLAUDE.md'), 'utf8')).toContain(POINTER_LINE);
     expect(existsSync(join(repo, 'screenify-out', 'INDEX.md'))).toBe(true);
@@ -63,6 +67,15 @@ describe('init', () => {
     expect(readFileSync(join(home, '.claude/agents/screenify-capture.md'), 'utf8')).toBe(captureAgent);
     expect(readFileSync(join(repo, '.gitignore'), 'utf8')).toBe('node_modules\nscreenify-out\n');
     expect(readFileSync(join(repo, 'CLAUDE.md'), 'utf8').split(POINTER_LINE).length).toBe(2);
+  });
+
+  it('puts the pointer after the first heading and replaces an older pointer', () => {
+    expect(withPointer('# Project\n\nIntro.\n\n## Rules\n- a\n')).toBe(`# Project\n\n${POINTER_LINE}\n\nIntro.\n\n## Rules\n- a\n`);
+    expect(withPointer('No heading here.\n')).toBe(`${POINTER_LINE}\n\nNo heading here.\n`);
+    const old = '# Project\n\nIntro.\n\nApp screenshots: see `screenify-out/INDEX.md` (managed by Screenify).\n';
+    expect(withPointer(old)).toBe(`# Project\n\n${POINTER_LINE}\n\nIntro.\n`);
+    const moved = `# Project\n\nIntro.\n\n${POINTER_LINE}\n`;
+    expect(withPointer(moved)).toBe(moved);
   });
 
   it('skips tools that are not installed', () => {

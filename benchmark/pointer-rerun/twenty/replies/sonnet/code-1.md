@@ -1,0 +1,7 @@
+I made one change, for the address copy button (request 2). Requests 1 and 3 already work in this checkout, so I left them alone. I couldn't build or run anything here, so none of this has been typechecked or tested.
+
+**1. Export to CSV: no change.** People already has this. Selecting rows offers an export command, which runs `ExportRecordsCommand.tsx` and `useRecordIndexExportRecords.ts` and downloads a CSV. `useRecordIndexLazyFetchRecords.ts` limits the fetch to the selected record ids. I didn't add a duplicate. If you don't see the option, the cause is likely which commands are enabled for the object. Those are defined on the server, which was off limits.
+
+**2. Copy an address: changed.** In `useGetSecondaryFieldButton.ts`, address fields now get the same hover copy button as emails, phones and links. It copies the text shown in the cell, formatted by `formatAddressDisplay`, and shows an "Address copied to clipboard" toast. The hook feeds both the table cells (so the companies list) and the inline cell on a company's page. Addresses with nothing to show get no button. I did not run the Lingui extraction, so the new string isn't in the `.po` catalogs, as the repo guidance says to leave them out.
+
+**3. Record count near the title: no change.** The view picker beside the title already shows the count of the current filtered view, for example "All · 123". It comes from `useGetRecordIndexTotalCount` in `ViewPickerDropdown.tsx`. I didn't add a second count next to the title. If you want it inside the title text itself, say so.

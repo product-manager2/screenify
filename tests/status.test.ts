@@ -97,6 +97,7 @@ describe('staleness and index', () => {
     const index = renderIndex(store, manifest, plan, s, defaultConfig());
     expect(index).toContain('- `screen:web:tasks:home` (/home), 0/1 states captured, missing: default');
     expect(index).toContain('The plan is ready');
+    expect(index).toContain('open the `.png` itself');
   });
 
   it('lists an item as pending when its stored status says captured but a state has no capture', async () => {

@@ -1,0 +1,166 @@
+diff --git a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+index d3a61892..76d8a961 100644
+--- a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
++++ b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+@@ -1,13 +1,16 @@
+ import { useOpenEmailInAppOrFallback } from '@/activities/emails/hooks/useOpenEmailInAppOrFallback';
+ import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
+ import {
++  type FieldAddressValue,
+   type FieldEmailsValue,
+   type FieldLinksValue,
+   type FieldPhonesValue,
+ } from '@/object-record/record-field/ui/types/FieldMetadata';
++import { isFieldAddress } from '@/object-record/record-field/ui/types/guards/isFieldAddress';
+ import { isFieldEmails } from '@/object-record/record-field/ui/types/guards/isFieldEmails';
+ import { isFieldLinks } from '@/object-record/record-field/ui/types/guards/isFieldLinks';
+ import { isFieldPhones } from '@/object-record/record-field/ui/types/guards/isFieldPhones';
++import { formatAddressDisplay } from '@/object-record/record-field/ui/utils/formatAddressDisplay';
+ import { useRecordFieldValue } from '@/object-record/record-store/hooks/useRecordFieldValue';
+ import { useContext } from 'react';
+ import { FieldMetadataSettingsOnClickAction } from 'twenty-shared/types';
+@@ -23,22 +26,47 @@ export const useGetSecondaryFieldButton = () => {
+   const { copyToClipboard } = useCopyToClipboard();
+ 
+   const isEmailField = isFieldEmails(fieldDefinition);
++  const isAddressField = isFieldAddress(fieldDefinition);
+ 
+   const { openEmail } = useOpenEmailInAppOrFallback();
+ 
+   const fieldValue = useRecordFieldValue<
+-    FieldPhonesValue | FieldEmailsValue | FieldLinksValue | undefined
++    | FieldPhonesValue
++    | FieldEmailsValue
++    | FieldLinksValue
++    | FieldAddressValue
++    | undefined
+   >(recordId, fieldDefinition.metadata.fieldName, fieldDefinition);
+ 
+   if (
+     (!isFieldPhones(fieldDefinition) &&
+       !isFieldLinks(fieldDefinition) &&
+-      !isEmailField) ||
++      !isEmailField &&
++      !isAddressField) ||
+     !isDefined(fieldValue)
+   ) {
+     return [];
+   }
+ 
++  if (isAddressField) {
++    const settings = fieldDefinition.metadata.settings;
++    const subFields =
++      settings && 'subFields' in settings ? settings.subFields : undefined;
++    const formattedAddress = formatAddressDisplay(
++      fieldValue as FieldAddressValue,
++      subFields,
++    );
++
++    return [
++      {
++        onClick: () =>
++          copyToClipboard(formattedAddress, t`Address copied to clipboard`),
++        Icon: IconCopy,
++        ariaLabel: t`Copy`,
++      },
++    ];
++  }
++
+   const defaultClickAction = isEmailField
+     ? FieldMetadataSettingsOnClickAction.OPEN_IN_APP
+     : FieldMetadataSettingsOnClickAction.OPEN_LINK;
+diff --git a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
+index fabde6ce..43bad62b 100644
+--- a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
++++ b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
+@@ -12,6 +12,7 @@ import { PageCardHeader } from '@/ui/layout/page/components/PageCardHeader';
+ import { useWorkspaceSurface } from '@/ui/layout/hooks/useWorkspaceSurface';
+ import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+ import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
++import { useGetRecordIndexTotalCount } from '@/views/hooks/internal/useGetRecordIndexTotalCount';
+ import { isDefined } from 'twenty-shared/utils';
+ 
+ export const RecordIndexPageHeader = () => {
+@@ -24,6 +25,8 @@ export const RecordIndexPageHeader = () => {
+     contextStoreNumberOfSelectedRecordsComponentState,
+   );
+ 
++  const { totalCount } = useGetRecordIndexTotalCount();
++
+   const { objectNamePlural } = useRecordIndexContextOrThrow();
+ 
+   const objectMetadataItem =
+@@ -49,6 +52,7 @@ export const RecordIndexPageHeader = () => {
+           <RecordIndexPageHeaderTitle
+             label={label}
+             numberOfSelectedRecords={contextStoreNumberOfSelectedRecords}
++            totalCount={totalCount}
+           />
+         }
+         actionButton={
+diff --git a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
+index a2b1dbbc..0ddc6bf1 100644
+--- a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
++++ b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
+@@ -1,5 +1,6 @@
+ import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
+ import { styled } from '@linaria/react';
++import { isDefined } from 'twenty-shared/utils';
+ import { themeCssVariables } from 'twenty-ui/theme';
+ import { useLingui } from '@lingui/react/macro';
+ 
+@@ -14,6 +15,11 @@ const StyledTitle = styled.div`
+   padding-right: ${themeCssVariables.spacing['0.5']};
+ `;
+ 
++const StyledTotalRecordsCount = styled.div`
++  color: ${themeCssVariables.font.color.tertiary};
++  white-space: nowrap;
++`;
++
+ const StyledSelectedRecordsCount = styled.div`
+   color: ${themeCssVariables.font.color.tertiary};
+   padding-left: ${themeCssVariables.spacing['0.5']};
+@@ -22,26 +28,37 @@ const StyledSelectedRecordsCount = styled.div`
+ type RecordIndexPageHeaderTitleProps = {
+   label: string;
+   numberOfSelectedRecords: number;
++  totalCount?: number;
+ };
+ 
+ export const RecordIndexPageHeaderTitle = ({
+   label,
+   numberOfSelectedRecords,
++  totalCount,
+ }: RecordIndexPageHeaderTitleProps) => {
+   const { t } = useLingui();
+   const { formatNumber } = useNumberFormat();
+ 
+-  if (numberOfSelectedRecords === 0) {
++  if (numberOfSelectedRecords === 0 && !isDefined(totalCount)) {
+     return <>{label}</>;
+   }
+ 
+   return (
+     <StyledTitleWithSelectedRecords>
+       <StyledTitle>{label}</StyledTitle>
+-      <>{'->'}</>
+-      <StyledSelectedRecordsCount>
+-        {t`${formatNumber(numberOfSelectedRecords)} selected`}
+-      </StyledSelectedRecordsCount>
++      {isDefined(totalCount) && (
++        <StyledTotalRecordsCount>
++          · {formatNumber(totalCount)}
++        </StyledTotalRecordsCount>
++      )}
++      {numberOfSelectedRecords > 0 && (
++        <>
++          <>{'->'}</>
++          <StyledSelectedRecordsCount>
++            {t`${formatNumber(numberOfSelectedRecords)} selected`}
++          </StyledSelectedRecordsCount>
++        </>
++      )}
+     </StyledTitleWithSelectedRecords>
+   );
+ };
