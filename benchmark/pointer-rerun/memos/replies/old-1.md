@@ -1,0 +1,9 @@
+All three requests are implemented in `web/src/`, but nothing is built, linted, or tested. This environment has no shell, and `node_modules` is not installed. The lucide icon `CopyPlusIcon` is the one thing I could not confirm against the installed package.
+
+1. **Copy a memo's text: no change.** The card's ⋮ menu already has Copy → Copy Content (`web/src/components/MemoActionMenu/MemoActionMenu.tsx`), which copies the raw memo text without opening the editor. It is two menu levels deep rather than one click. If you want it one click, I can promote it to a top-level item.
+
+2. **Duplicate a memo: added.** `web/src/components/MemoActionMenu/hooks.ts` gets `handleDuplicateMemo`, which creates a memo with the same content, visibility and Space, then marks it "New" and shows a success toast. `MemoActionMenu.tsx` adds the item after Copy, using the existing `common.duplicate` key. The message string `message.duplicated-successfully` is in `web/src/locales/en.json`.
+   - Decisions: I copy `space` as well as content and visibility, because the server rejects SPACE-visibility memos without a Space. Attachments, pin state and comments are not copied. The item also appears on comments, and the copy is a top-level memo. Other locales fall back to English.
+
+3. **"Edited" label: added.** `web/src/components/MemoView/components/MemoHeader.tsx` shows a muted "Edited" badge next to the "New" badge when update time differs from create time. It is hidden when the time already reads "Last updated", to avoid repeating it. The label string `memo.edited-badge` is in `web/src/locales/en.json`.
+   - Note: the server bumps update time when attachments or relations change, so those also count as edits. Pin and archive do not.

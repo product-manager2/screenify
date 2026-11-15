@@ -1,0 +1,171 @@
+diff --git a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/__tests__/useGetSecondaryFieldButton.test.tsx b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/__tests__/useGetSecondaryFieldButton.test.tsx
+new file mode 100644
+index 00000000..731ac47d
+--- /dev/null
++++ b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/__tests__/useGetSecondaryFieldButton.test.tsx
+@@ -0,0 +1,112 @@
++import { renderHook } from '@testing-library/react';
++import { type ReactNode } from 'react';
++
++import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
++import { useGetSecondaryFieldButton } from '@/object-record/record-field/ui/hooks/useGetSecondaryFieldButton';
++import { type FieldDefinition } from '@/object-record/record-field/ui/types/FieldDefinition';
++import {
++  type FieldAddressMetadata,
++  type FieldAddressValue,
++} from '@/object-record/record-field/ui/types/FieldMetadata';
++import { FieldMetadataType } from '~/generated-metadata/graphql';
++import { IconCopy } from 'twenty-ui/icon';
++
++const mockCopyToClipboard = jest.fn();
++let mockFieldValue: FieldAddressValue | undefined;
++
++jest.mock('~/hooks/useCopyToClipboard', () => ({
++  useCopyToClipboard: () => ({ copyToClipboard: mockCopyToClipboard }),
++}));
++
++jest.mock('@/object-record/record-store/hooks/useRecordFieldValue', () => ({
++  useRecordFieldValue: () => mockFieldValue,
++}));
++
++jest.mock('@/activities/emails/hooks/useOpenEmailInAppOrFallback', () => ({
++  useOpenEmailInAppOrFallback: () => ({ openEmail: jest.fn() }),
++}));
++
++const addressFieldDefinition: FieldDefinition<FieldAddressMetadata> = {
++  fieldMetadataId: 'addressFieldMetadataId',
++  label: 'Address',
++  iconName: 'IconMap',
++  type: FieldMetadataType.ADDRESS,
++  defaultValue: null,
++  metadata: {
++    fieldName: 'address',
++    placeHolder: 'Address',
++  },
++};
++
++const wrapper = ({ children }: { children: ReactNode }) => (
++  <FieldContext.Provider
++    value={{
++      fieldDefinition: addressFieldDefinition,
++      recordId: 'recordId',
++      isLabelIdentifier: false,
++      isRecordFieldReadOnly: false,
++    }}
++  >
++    {children}
++  </FieldContext.Provider>
++);
++
++describe('useGetSecondaryFieldButton', () => {
++  beforeEach(() => {
++    mockCopyToClipboard.mockClear();
++  });
++
++  it('should return a copy button for an address', () => {
++    mockFieldValue = {
++      addressStreet1: '888 Brannan St',
++      addressStreet2: null,
++      addressCity: 'San Francisco',
++      addressState: 'CA',
++      addressPostcode: '94107',
++      addressCountry: 'United States',
++      addressLat: null,
++      addressLng: null,
++    };
++
++    const { result } = renderHook(() => useGetSecondaryFieldButton(), {
++      wrapper,
++    });
++
++    expect(result.current).toHaveLength(1);
++    expect(result.current[0].Icon).toBe(IconCopy);
++  });
++
++  it('should copy the formatted address when the button is clicked', () => {
++    mockFieldValue = {
++      addressStreet1: '888 Brannan St',
++      addressStreet2: null,
++      addressCity: 'San Francisco',
++      addressState: 'CA',
++      addressPostcode: '94107',
++      addressCountry: 'United States',
++      addressLat: null,
++      addressLng: null,
++    };
++
++    const { result } = renderHook(() => useGetSecondaryFieldButton(), {
++      wrapper,
++    });
++
++    result.current[0].onClick();
++
++    expect(mockCopyToClipboard).toHaveBeenCalledWith(
++      '888 Brannan St, San Francisco, CA, 94107, United States',
++      expect.any(String),
++    );
++  });
++
++  it('should return no button when the address is empty', () => {
++    mockFieldValue = undefined;
++
++    const { result } = renderHook(() => useGetSecondaryFieldButton(), {
++      wrapper,
++    });
++
++    expect(result.current).toEqual([]);
++  });
++});
+diff --git a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+index d3a61892..1cc1cf86 100644
+--- a/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
++++ b/packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts
+@@ -1,10 +1,13 @@
+ import { useOpenEmailInAppOrFallback } from '@/activities/emails/hooks/useOpenEmailInAppOrFallback';
+ import { FieldContext } from '@/object-record/record-field/ui/contexts/FieldContext';
++import { formatAddressDisplay } from '@/object-record/record-field/ui/utils/formatAddressDisplay';
+ import {
++  type FieldAddressValue,
+   type FieldEmailsValue,
+   type FieldLinksValue,
+   type FieldPhonesValue,
+ } from '@/object-record/record-field/ui/types/FieldMetadata';
++import { isFieldAddress } from '@/object-record/record-field/ui/types/guards/isFieldAddress';
+ import { isFieldEmails } from '@/object-record/record-field/ui/types/guards/isFieldEmails';
+ import { isFieldLinks } from '@/object-record/record-field/ui/types/guards/isFieldLinks';
+ import { isFieldPhones } from '@/object-record/record-field/ui/types/guards/isFieldPhones';
+@@ -27,9 +30,33 @@ export const useGetSecondaryFieldButton = () => {
+   const { openEmail } = useOpenEmailInAppOrFallback();
+ 
+   const fieldValue = useRecordFieldValue<
+-    FieldPhonesValue | FieldEmailsValue | FieldLinksValue | undefined
++    | FieldPhonesValue
++    | FieldEmailsValue
++    | FieldLinksValue
++    | FieldAddressValue
++    | undefined
+   >(recordId, fieldDefinition.metadata.fieldName, fieldDefinition);
+ 
++  if (isFieldAddress(fieldDefinition)) {
++    if (!isDefined(fieldValue)) {
++      return [];
++    }
++
++    const formattedAddress = formatAddressDisplay(
++      fieldValue as FieldAddressValue,
++      fieldDefinition.metadata.settings?.subFields,
++    );
++
++    return [
++      {
++        onClick: () =>
++          copyToClipboard(formattedAddress, t`Address copied to clipboard`),
++        Icon: IconCopy,
++        ariaLabel: t`Copy`,
++      },
++    ];
++  }
++
+   if (
+     (!isFieldPhones(fieldDefinition) &&
+       !isFieldLinks(fieldDefinition) &&

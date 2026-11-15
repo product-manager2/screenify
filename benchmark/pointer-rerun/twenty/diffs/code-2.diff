@@ -1,0 +1,144 @@
+diff --git a/packages/twenty-front/src/modules/object-record/record-field/ui/meta-types/display/components/AddressFieldDisplay.tsx b/packages/twenty-front/src/modules/object-record/record-field/ui/meta-types/display/components/AddressFieldDisplay.tsx
+index 685671ca..cfc3815a 100644
+--- a/packages/twenty-front/src/modules/object-record/record-field/ui/meta-types/display/components/AddressFieldDisplay.tsx
++++ b/packages/twenty-front/src/modules/object-record/record-field/ui/meta-types/display/components/AddressFieldDisplay.tsx
+@@ -1,6 +1,31 @@
+ import { useAddressFieldDisplay } from '@/object-record/record-field/ui/meta-types/hooks/useAddressFieldDisplay';
+ import { TextDisplay } from '@/ui/field/display/components/TextDisplay/TextDisplay';
++import { LightCopyIconButton } from '@/ui/input/components/LightCopyIconButton';
+ import { formatAddressDisplay } from '@/object-record/record-field/ui/utils/formatAddressDisplay';
++import { styled } from '@linaria/react';
++import { themeCssVariables } from 'twenty-ui/theme';
++
++const StyledCopyContainer = styled.div`
++  display: flex;
++  opacity: 0;
++`;
++
++const StyledContainer = styled.div`
++  align-items: center;
++  display: flex;
++  gap: ${themeCssVariables.spacing[1]};
++  min-width: 0;
++
++  &:hover > ${StyledCopyContainer},
++  &:focus-within > ${StyledCopyContainer} {
++    opacity: 1;
++  }
++`;
++
++const StyledTextContainer = styled.div`
++  flex: 1;
++  min-width: 0;
++`;
+ 
+ export const AddressFieldDisplay = () => {
+   const { fieldValue, fieldDefinition } = useAddressFieldDisplay();
+@@ -10,5 +35,17 @@ export const AddressFieldDisplay = () => {
+     settings && 'subFields' in settings ? settings.subFields : undefined;
+ 
+   const parsedFieldValue = formatAddressDisplay(fieldValue, subFields);
+-  return <TextDisplay text={parsedFieldValue} />;
++
++  return (
++    <StyledContainer>
++      <StyledTextContainer>
++        <TextDisplay text={parsedFieldValue} />
++      </StyledTextContainer>
++      {parsedFieldValue !== '' && (
++        <StyledCopyContainer onClick={(event) => event.stopPropagation()}>
++          <LightCopyIconButton copyText={parsedFieldValue} />
++        </StyledCopyContainer>
++      )}
++    </StyledContainer>
++  );
+ };
+diff --git a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
+index fabde6ce..5e961818 100644
+--- a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
++++ b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeader.tsx
+@@ -12,6 +12,7 @@ import { PageCardHeader } from '@/ui/layout/page/components/PageCardHeader';
+ import { useWorkspaceSurface } from '@/ui/layout/hooks/useWorkspaceSurface';
+ import { useAtomComponentStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomComponentStateValue';
+ import { useAtomStateValue } from '@/ui/utilities/state/jotai/hooks/useAtomStateValue';
++import { useGetRecordIndexTotalCount } from '@/views/hooks/internal/useGetRecordIndexTotalCount';
+ import { isDefined } from 'twenty-shared/utils';
+ 
+ export const RecordIndexPageHeader = () => {
+@@ -31,6 +32,8 @@ export const RecordIndexPageHeader = () => {
+ 
+   const label = objectMetadataItem?.labelPlural ?? objectNamePlural;
+ 
++  const { totalCount } = useGetRecordIndexTotalCount();
++
+   const contextStoreCurrentViewId = useAtomComponentStateValue(
+     contextStoreCurrentViewIdComponentState,
+   );
+@@ -49,6 +52,7 @@ export const RecordIndexPageHeader = () => {
+           <RecordIndexPageHeaderTitle
+             label={label}
+             numberOfSelectedRecords={contextStoreNumberOfSelectedRecords}
++            totalCount={totalCount}
+           />
+         }
+         actionButton={
+diff --git a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
+index a2b1dbbc..82e90a46 100644
+--- a/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
++++ b/packages/twenty-front/src/modules/object-record/record-index/components/RecordIndexPageHeaderTitle.tsx
+@@ -2,6 +2,7 @@ import { useNumberFormat } from '@/localization/hooks/useNumberFormat';
+ import { styled } from '@linaria/react';
+ import { themeCssVariables } from 'twenty-ui/theme';
+ import { useLingui } from '@lingui/react/macro';
++import { isDefined } from 'twenty-shared/utils';
+ 
+ const StyledTitleWithSelectedRecords = styled.div`
+   display: flex;
+@@ -19,29 +20,42 @@ const StyledSelectedRecordsCount = styled.div`
+   padding-left: ${themeCssVariables.spacing['0.5']};
+ `;
+ 
++const StyledTotalCount = styled.div`
++  color: ${themeCssVariables.font.color.tertiary};
++`;
++
+ type RecordIndexPageHeaderTitleProps = {
+   label: string;
+   numberOfSelectedRecords: number;
++  totalCount?: number;
+ };
+ 
+ export const RecordIndexPageHeaderTitle = ({
+   label,
+   numberOfSelectedRecords,
++  totalCount,
+ }: RecordIndexPageHeaderTitleProps) => {
+   const { t } = useLingui();
+   const { formatNumber } = useNumberFormat();
+ 
+-  if (numberOfSelectedRecords === 0) {
++  if (numberOfSelectedRecords === 0 && !isDefined(totalCount)) {
+     return <>{label}</>;
+   }
+ 
+   return (
+     <StyledTitleWithSelectedRecords>
+       <StyledTitle>{label}</StyledTitle>
+-      <>{'->'}</>
+-      <StyledSelectedRecordsCount>
+-        {t`${formatNumber(numberOfSelectedRecords)} selected`}
+-      </StyledSelectedRecordsCount>
++      {isDefined(totalCount) && (
++        <StyledTotalCount>{formatNumber(totalCount)}</StyledTotalCount>
++      )}
++      {numberOfSelectedRecords > 0 && (
++        <>
++          <>{'->'}</>
++          <StyledSelectedRecordsCount>
++            {t`${formatNumber(numberOfSelectedRecords)} selected`}
++          </StyledSelectedRecordsCount>
++        </>
++      )}
+     </StyledTitleWithSelectedRecords>
+   );
+ };

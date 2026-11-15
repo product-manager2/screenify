@@ -1,0 +1,193 @@
+{
+ "twenty-browse-1": {
+  "cost_usd_list_price": 0.6831,
+  "seconds": 984,
+  "turns": 117,
+  "tool_calls": 116,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 224,
+  "output_tokens": 63484,
+  "cache_read": 11864988,
+  "cache_write": 180442,
+  "ok": true
+ },
+ "twenty-browse-2": {
+  "cost_usd_list_price": 0.28,
+  "seconds": 758,
+  "turns": 68,
+  "tool_calls": 67,
+  "denied_tool_calls": 1,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 132,
+  "output_tokens": 45601,
+  "cache_read": 5309489,
+  "cache_write": 133810,
+  "ok": true
+ },
+ "twenty-browse-3": {
+  "cost_usd_list_price": 0.5221,
+  "seconds": 6,
+  "turns": 1,
+  "tool_calls": 85,
+  "denied_tool_calls": 1,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 4,
+  "output_tokens": 272,
+  "cache_read": 160591,
+  "cache_write": 2369,
+  "ok": true
+ },
+ "twenty-code-1": {
+  "cost_usd_list_price": 0.1717,
+  "seconds": 238,
+  "turns": 66,
+  "tool_calls": 65,
+  "denied_tool_calls": 1,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 1,
+   "before_first_edit": true,
+   "images": []
+  },
+  "input_tokens": 82,
+  "output_tokens": 37025,
+  "cache_read": 2800052,
+  "cache_write": 116458,
+  "ok": true
+ },
+ "twenty-code-2": {
+  "cost_usd_list_price": 0.1879,
+  "seconds": 233,
+  "turns": 67,
+  "tool_calls": 66,
+  "denied_tool_calls": 1,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 84,
+  "output_tokens": 33969,
+  "cache_read": 3256685,
+  "cache_write": 119266,
+  "ok": true
+ },
+ "twenty-code-3": {
+  "cost_usd_list_price": 0.0952,
+  "seconds": 167,
+  "turns": 53,
+  "tool_calls": 52,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 0,
+   "searches_or_listings": 0,
+   "before_first_edit": false,
+   "images": []
+  },
+  "input_tokens": 70,
+  "output_tokens": 24025,
+  "cache_read": 2087470,
+  "cache_write": 102962,
+  "ok": true
+ },
+ "twenty-lib-1": {
+  "cost_usd_list_price": 0.2949,
+  "seconds": 258,
+  "turns": 72,
+  "tool_calls": 71,
+  "denied_tool_calls": 1,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 1,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 2,
+   "before_first_edit": true,
+   "images": [
+    "screens/web/records/record-table/record-table--rows-selected--desktop-1440x900--app-default.png"
+   ]
+  },
+  "input_tokens": 92,
+  "output_tokens": 35414,
+  "cache_read": 4116281,
+  "cache_write": 141232,
+  "ok": true
+ },
+ "twenty-lib-2": {
+  "cost_usd_list_price": 0.1807,
+  "seconds": 174,
+  "turns": 39,
+  "tool_calls": 38,
+  "denied_tool_calls": 0,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 0,
+   "index_opened": 1,
+   "searches_or_listings": 2,
+   "before_first_edit": true,
+   "images": []
+  },
+  "input_tokens": 54,
+  "output_tokens": 21155,
+  "cache_read": 2267850,
+  "cache_write": 125288,
+  "ok": true
+ },
+ "twenty-lib-3": {
+  "cost_usd_list_price": 0.2445,
+  "seconds": 234,
+  "turns": 56,
+  "tool_calls": 55,
+  "denied_tool_calls": 1,
+  "skill_calls": [],
+  "library": {
+   "images_opened": 0,
+   "sidecars_opened": 1,
+   "index_opened": 1,
+   "searches_or_listings": 3,
+   "before_first_edit": true,
+   "images": []
+  },
+  "input_tokens": 74,
+  "output_tokens": 32185,
+  "cache_read": 3300844,
+  "cache_write": 142107,
+  "ok": true
+ }
+}

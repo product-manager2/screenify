@@ -1,0 +1,1152 @@
+diff --git a/web/src/components/MemoActionMenu/MemoActionMenu.tsx b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+index 035647c..7821ac0 100644
+--- a/web/src/components/MemoActionMenu/MemoActionMenu.tsx
++++ b/web/src/components/MemoActionMenu/MemoActionMenu.tsx
+@@ -6,6 +6,7 @@ import {
+   BookmarkPlusIcon,
+   CheckCheckIcon,
+   CopyIcon,
++  CopyPlusIcon,
+   Edit3Icon,
+   FileTextIcon,
+   LinkIcon,
+@@ -37,9 +38,10 @@ import type { MemoActionMenuProps } from "./types";
+ /**
+  * The memo's action menu, grouped by what each action does to the card:
+  * write on it (Edit, the task action), place it (Pin, Archive), reach it beyond
+- * the feed (Open its page, Copy its link or content), then Delete last.
+- * A memo's Space is changed in the editor, not here. An archived memo offers
+- * only Restore and Delete, and a viewer only Open and Copy.
++ * the feed (Open its page, Copy its link or content), make a copy of it
++ * (Duplicate), then Delete last. A memo's Space is changed in the editor, not
++ * here. An archived memo offers only Restore and Delete, a viewer only Open and
++ * Copy, and a comment has no Pin, Archive or Duplicate of its own.
+  */
+ const MemoActionMenu = (props: MemoActionMenuProps) => {
+   const { memo, parentPage, readonly } = props;
+@@ -62,6 +64,7 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemo,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+@@ -173,6 +176,12 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
+         <DropdownMenuSeparator />
+         {openItem}
+         {copySubmenu}
++        {!isComment && (
++          <DropdownMenuItem onClick={handleDuplicateMemo}>
++            <CopyPlusIcon />
++            {t("memo.duplicate")}
++          </DropdownMenuItem>
++        )}
+ 
+         <DropdownMenuSeparator />
+         {deleteItem}
+diff --git a/web/src/components/MemoActionMenu/hooks.ts b/web/src/components/MemoActionMenu/hooks.ts
+index 38344a6..ea54346 100644
+--- a/web/src/components/MemoActionMenu/hooks.ts
++++ b/web/src/components/MemoActionMenu/hooks.ts
+@@ -1,10 +1,11 @@
++import { create } from "@bufbuild/protobuf";
+ import { useQueryClient } from "@tanstack/react-query";
+ import copy from "copy-to-clipboard";
+ import { useCallback } from "react";
+ import toast from "react-hot-toast";
+ import { useLocation } from "react-router-dom";
+ import { useInstance } from "@/contexts/InstanceContext";
+-import { memoKeys, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
++import { memoKeys, useCreateMemo, useDeleteMemo, useUpdateMemo } from "@/hooks/useMemoQueries";
+ import useNavigateTo from "@/hooks/useNavigateTo";
+ import { userKeys } from "@/hooks/useUserQueries";
+ import { handleError } from "@/lib/error";
+@@ -12,6 +13,7 @@ import { extractMemoIdFromName } from "@/lib/resource-names";
+ import { ROUTES } from "@/router/routes";
+ import { State } from "@/types/proto/api/common_pb";
+ import type { Memo } from "@/types/proto/api/memo_service_pb";
++import { MemoSchema } from "@/types/proto/api/memo_service_pb";
+ import { useTranslate } from "@/utils/i18n";
+ import { checkAllTasks, uncheckAllTasks } from "@/utils/markdown-task-actions";
+ import { isMemoDetailPath } from "../MemoView/navigation";
+@@ -31,6 +33,7 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+   const { profile } = useInstance();
+   const { mutateAsync: updateMemo } = useUpdateMemo();
+   const { mutateAsync: deleteMemo } = useDeleteMemo();
++  const { mutateAsync: createMemo } = useCreateMemo();
+   const isInMemoDetailPage = isMemoDetailPath(location.pathname, memo.name);
+ 
+   const memoUpdatedCallback = useCallback(() => {
+@@ -125,6 +128,19 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     toast.success(t("message.succeed-copy-content"));
+   }, [memo.content, t]);
+ 
++  // A copy takes the content, visibility and Space; attachments, relations and location stay with the original.
++  const handleDuplicateMemo = useCallback(async () => {
++    try {
++      await createMemo({
++        memo: create(MemoSchema, { content: memo.content, visibility: memo.visibility, space: memo.space }),
++      });
++    } catch (error: unknown) {
++      handleError(error, toast.error, { context: "Duplicate memo", fallbackMessage: "An error occurred" });
++      return;
++    }
++    toast.success(t("message.duplicated-successfully"));
++  }, [memo.content, memo.space, memo.visibility, t, createMemo]);
++
+   const handleCheckAllTaskListItemsClick = useCallback(async () => {
+     await updateMemoContent(checkAllTasks(memo.content), "Check memo task list items");
+   }, [memo.content, updateMemoContent]);
+@@ -162,6 +178,7 @@ export const useMemoActionHandlers = ({ memo, parentPage, onEdit, setDeleteDialo
+     handleToggleMemoStatusClick,
+     handleCopyLink,
+     handleCopyContent,
++    handleDuplicateMemo,
+     handleCheckAllTaskListItemsClick,
+     handleUncheckAllTaskListItemsClick,
+     handleDeleteMemoClick,
+diff --git a/web/src/components/MemoView/MemoViewContext.tsx b/web/src/components/MemoView/MemoViewContext.tsx
+index 250c89d..6af90ca 100644
+--- a/web/src/components/MemoView/MemoViewContext.tsx
++++ b/web/src/components/MemoView/MemoViewContext.tsx
+@@ -55,6 +55,8 @@ export const useMemoViewDerived = () => {
+   const displayTime = timeBasis === "update_time" ? updateTime : createTime;
+   const isDisplayingUpdatedTime =
+     timeBasis === "update_time" && !!createTime && !!updateTime && updateTime.getTime() !== createTime.getTime();
++  // The server stamps update_time when the content changes, so a later one marks an edit.
++  const isEdited = !!createTime && !!updateTime && updateTime.getTime() > createTime.getTime();
+   const relativeTimeFormat: "datetime" | "auto" =
+     displayTime && Date.now() - displayTime.getTime() > RELATIVE_TIME_THRESHOLD_MS ? "datetime" : "auto";
+ 
+@@ -67,6 +69,7 @@ export const useMemoViewDerived = () => {
+     updateTime,
+     displayTime,
+     isDisplayingUpdatedTime,
++    isEdited,
+     relativeTimeFormat,
+   };
+ };
+diff --git a/web/src/components/MemoView/components/MemoHeader.tsx b/web/src/components/MemoView/components/MemoHeader.tsx
+index a4b73fb..0d6fc61 100644
+--- a/web/src/components/MemoView/components/MemoHeader.tsx
++++ b/web/src/components/MemoView/components/MemoHeader.tsx
+@@ -29,7 +29,14 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+ 
+   const { memo, creator, currentUser, parentPage, isArchived, readonly, isEditing, openEditor } = useMemoViewContext();
+   const location = useLocation();
+-  const { createTime, updateTime, displayTime: memoDisplayTime, isDisplayingUpdatedTime, relativeTimeFormat } = useMemoViewDerived();
++  const {
++    createTime,
++    updateTime,
++    displayTime: memoDisplayTime,
++    isDisplayingUpdatedTime,
++    isEdited,
++    relativeTimeFormat,
++  } = useMemoViewDerived();
+   const { newMemoName } = useNewMemo();
+   const visibilityOption = getVisibilityOption(memo.visibility);
+ 
+@@ -54,6 +61,8 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+         ? `${t("common.last-updated-at")}: ${updateTime.toLocaleString(i18n.language)}`
+         : undefined,
+   };
++  // The time already reads "Last updated at" when the feed sorts by update time, so the mark would repeat it.
++  const showEditedMark = isEdited && !isDisplayingUpdatedTime;
+   const spaceMetadata = showSpace && memo.space ? <MemoSpaceBadge spaceName={memo.space} /> : null;
+   const showsCreator = Boolean(showCreator && creator);
+   const isNew = memo.name === newMemoName;
+@@ -89,6 +98,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ timeDisplay = "relative", showC
+             parentPage={parentPage}
+             isCurrentPage={isMemoDetailPath(location.pathname, memo.name)}
+           />
++          {showEditedMark && <EditedMark />}
+           {spaceMetadata}
+         </div>
+         {isNew && <NewBadge />}
+@@ -126,6 +136,19 @@ const NewBadge = () => {
+   );
+ };
+ 
++/** A muted "edited" after the time; its tooltip already gives the last-updated time. */
++const EditedMark = () => {
++  const t = useTranslate();
++  return (
++    <>
++      <span aria-hidden="true" className="shrink-0 text-muted-foreground/40">
++        ·
++      </span>
++      <span className="shrink-0 whitespace-nowrap text-2xs text-muted-foreground select-none">{t("memo.edited")}</span>
++    </>
++  );
++};
++
+ /**
+  * The author on one line with the time: a 20px avatar in a 20px slot, then the name in
+  * medium 13px foreground ink. It is the identity, so it carries the weight; the time after
+diff --git a/web/src/locales/ar.json b/web/src/locales/ar.json
+index 240faf9..90c5717 100644
+--- a/web/src/locales/ar.json
++++ b/web/src/locales/ar.json
+@@ -335,6 +335,8 @@
+       "open-image": "مشاركة كصورة"
+     },
+     "new-badge": "جديد",
++    "duplicate": "تكرار",
++    "edited": "مُعدَّلة",
+     "parent-loading": "جارٍ تحميل المذكرة الأصلية...",
+     "parent-load-error": "تعذر تحميل المذكرة الأصلية.",
+     "parent-unavailable": "المذكرة الأصلية غير متوفرة",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "تمت الأرشفة بنجاح",
+     "copied": "تم النسخ",
+     "deleted-successfully": "تم الحذف بنجاح",
++    "duplicated-successfully": "تم تكرار المذكرة بنجاح",
+     "description-is-required": "الوصف مطلوب",
+     "fill-all": "يرجى ملء جميع الحقول.",
+     "fill-all-required-fields": "يرجى ملء جميع الحقول المطلوبة",
+diff --git a/web/src/locales/az.json b/web/src/locales/az.json
+index 8fa87e3..1b6dd17 100644
+--- a/web/src/locales/az.json
++++ b/web/src/locales/az.json
+@@ -413,6 +413,8 @@
+     "link-preview": "Keçid önbaxışı",
+     "load-more": "Daha çox yüklə",
+     "new-badge": "Yeni",
++    "duplicate": "Dublikat et",
++    "edited": "redaktə edilib",
+     "newest-first": "Əvvəlcə ən yenilər",
+     "oldest-first": "Əvvəlcə ən köhnələr",
+     "on-this-memo": "Bu qeyddə",
+@@ -468,6 +470,7 @@
+     "archived-successfully": "Uğurla arxivləndi",
+     "copied": "Kopyalandı",
+     "deleted-successfully": "Qeyd uğurla silindi",
++    "duplicated-successfully": "Qeyd uğurla dublikat edildi",
+     "description-is-required": "Təsvir tələb olunur",
+     "fill-all": "Zəhmət olmasa bütün sahələri doldurun.",
+     "fill-all-required-fields": "Zəhmət olmasa tələb olunan bütün sahələri doldurun",
+diff --git a/web/src/locales/bg.json b/web/src/locales/bg.json
+index d5fb513..38879c5 100644
+--- a/web/src/locales/bg.json
++++ b/web/src/locales/bg.json
+@@ -386,6 +386,8 @@
+       "space-description": "Всички в {{space}}"
+     },
+     "new-badge": "Нов",
++    "duplicate": "Дублиране",
++    "edited": "редактирано",
+     "parent-loading": "Зареждане на оригиналната бележка…",
+     "parent-load-error": "Не можа да се зареди оригиналната бележка.",
+     "parent-unavailable": "Оригиналната бележка не е налична",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Архивиран успешно",
+     "copied": "Копирано",
+     "deleted-successfully": "Бележката е изтрита успешно",
++    "duplicated-successfully": "Бележката е дублирана успешно",
+     "description-is-required": "Изисква се описание",
+     "fill-all": "Моля, попълнете всички полета.",
+     "fill-all-required-fields": "Моля, попълнете всички задължителни полета",
+diff --git a/web/src/locales/ca.json b/web/src/locales/ca.json
+index ae9d181..682f329 100644
+--- a/web/src/locales/ca.json
++++ b/web/src/locales/ca.json
+@@ -348,6 +348,8 @@
+       "updated": "Tasques actualitzades"
+     },
+     "new-badge": "Nou",
++    "duplicate": "Duplica",
++    "edited": "editat",
+     "parent-loading": "S'està carregant la nota original...",
+     "parent-load-error": "No s'ha pogut carregar la nota original.",
+     "parent-unavailable": "Nota original no disponible",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Arxivat correctament",
+     "copied": "Copiat",
+     "deleted-successfully": "Eliminat correctament",
++    "duplicated-successfully": "Nota duplicada correctament",
+     "description-is-required": "La descripció és obligatòria",
+     "fill-all": "Si us plau, omple tots els camps.",
+     "fill-all-required-fields": "Si us plau, omple tots els camps obligatoris",
+diff --git a/web/src/locales/cs.json b/web/src/locales/cs.json
+index bba2db8..1fd4649 100644
+--- a/web/src/locales/cs.json
++++ b/web/src/locales/cs.json
+@@ -348,6 +348,8 @@
+       "updated": "Úkoly aktualizovány"
+     },
+     "new-badge": "Nový",
++    "duplicate": "Duplikovat",
++    "edited": "upraveno",
+     "parent-loading": "Načítání původní poznámky…",
+     "parent-load-error": "Nepodařilo se načíst původní poznámku.",
+     "parent-unavailable": "Původní poznámka není k dispozici",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Úspěšně archivováno",
+     "copied": "Zkopírováno",
+     "deleted-successfully": "Úspěšně smazáno",
++    "duplicated-successfully": "Poznámka byla úspěšně duplikována",
+     "description-is-required": "Popis je vyžadován",
+     "fill-all": "Vyplňte prosím všechna pole",
+     "fill-all-required-fields": "Vyplňte prosím všechny požadované údaje",
+diff --git a/web/src/locales/da.json b/web/src/locales/da.json
+index 5abaea2..5167b98 100644
+--- a/web/src/locales/da.json
++++ b/web/src/locales/da.json
+@@ -386,6 +386,8 @@
+       "space-description": "Alle i {{space}}"
+     },
+     "new-badge": "Ny",
++    "duplicate": "Dupliker",
++    "edited": "redigeret",
+     "parent-loading": "Indlæser originalt notat…",
+     "parent-load-error": "Kunne ikke indlæse det originale notat.",
+     "parent-unavailable": "Originalt notat er ikke tilgængeligt",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Arkiveret",
+     "copied": "Kopieret",
+     "deleted-successfully": "Notatet blev slettet",
++    "duplicated-successfully": "Notatet blev duplikeret",
+     "description-is-required": "Beskrivelse er påkrævet",
+     "fill-all": "Udfyld venligst alle felter.",
+     "fill-all-required-fields": "Udfyld venligst alle obligatoriske felter",
+diff --git a/web/src/locales/de.json b/web/src/locales/de.json
+index 6c9dce0..3daf083 100644
+--- a/web/src/locales/de.json
++++ b/web/src/locales/de.json
+@@ -348,6 +348,8 @@
+       "updated": "Aufgaben aktualisiert"
+     },
+     "new-badge": "Neu",
++    "duplicate": "Duplizieren",
++    "edited": "bearbeitet",
+     "parent-loading": "Original-Memo wird geladen…",
+     "parent-load-error": "Original-Memo konnte nicht geladen werden.",
+     "parent-unavailable": "Original-Memo nicht verfügbar",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Erfolgreich archiviert",
+     "copied": "Kopiert",
+     "deleted-successfully": "Erfolgreich gelöscht",
++    "duplicated-successfully": "Notiz erfolgreich dupliziert",
+     "description-is-required": "Beschreibung ist erforderlich",
+     "fill-all": "Bitte alle Felder ausfüllen.",
+     "fill-all-required-fields": "Bitte alle Pflichtfelder ausfüllen",
+diff --git a/web/src/locales/el.json b/web/src/locales/el.json
+index c1d0861..751110b 100644
+--- a/web/src/locales/el.json
++++ b/web/src/locales/el.json
+@@ -386,6 +386,8 @@
+       "space-description": "Όλοι στο {{space}}"
+     },
+     "new-badge": "Νέος",
++    "duplicate": "Δημιουργία αντιγράφου",
++    "edited": "επεξεργάστηκε",
+     "parent-loading": "Φόρτωση αρχικού σημειώματος…",
+     "parent-load-error": "Δεν ήταν δυνατή η φόρτωση του αρχικού σημειώματος.",
+     "parent-unavailable": "Το αρχικό σημειώμα δεν είναι διαθέσιμο",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Αρχειοθετήθηκε με επιτυχία",
+     "copied": "Αντιγράφηκε",
+     "deleted-successfully": "Το σημείωμα διαγράφηκε με επιτυχία",
++    "duplicated-successfully": "Το σημείωμα αντιγράφηκε με επιτυχία",
+     "description-is-required": "Απαιτείται περιγραφή",
+     "fill-all": "Παρακαλούμε συμπληρώστε όλα τα πεδία.",
+     "fill-all-required-fields": "Συμπληρώστε όλα τα υποχρεωτικά πεδία",
+diff --git a/web/src/locales/en-GB.json b/web/src/locales/en-GB.json
+index a64e0cf..ad69655 100644
+--- a/web/src/locales/en-GB.json
++++ b/web/src/locales/en-GB.json
+@@ -363,6 +363,8 @@
+     "layout-list": "List",
+     "layout-list-description": "A single reading-width column",
+     "new-badge": "New",
++    "duplicate": "Duplicate",
++    "edited": "edited",
+     "on-this-memo": "On this memo",
+     "parent-memo": "Parent memo",
+     "view-options": "View options"
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Archived successfully",
+     "copied": "Copied",
+     "deleted-successfully": "Memo deleted successfully",
++    "duplicated-successfully": "Memo duplicated successfully",
+     "description-is-required": "Description is required",
+     "fill-all": "Please fill in all fields.",
+     "fill-all-required-fields": "Please fill all required fields",
+diff --git a/web/src/locales/en.json b/web/src/locales/en.json
+index 9e9eeca..1dd64b1 100644
+--- a/web/src/locales/en.json
++++ b/web/src/locales/en.json
+@@ -392,6 +392,8 @@
+     "delete-confirm": "Are you sure you want to delete this memo?",
+     "delete-confirm-description": "This action is irreversible. Attachments, links, and references will also be removed.",
+     "direction": "Direction",
++    "duplicate": "Duplicate",
++    "edited": "edited",
+     "filters": {
+       "has-attachments": "hasAttachments",
+       "has-code": "hasCode",
+@@ -469,6 +471,7 @@
+     "copied": "Copied",
+     "deleted-successfully": "Memo deleted successfully",
+     "description-is-required": "Description is required",
++    "duplicated-successfully": "Memo duplicated successfully",
+     "fill-all": "Please fill in all fields.",
+     "fill-all-required-fields": "Please fill all required fields",
+     "new-password-not-match": "New passwords do not match.",
+diff --git a/web/src/locales/es.json b/web/src/locales/es.json
+index bfdbdf0..85e72c2 100644
+--- a/web/src/locales/es.json
++++ b/web/src/locales/es.json
+@@ -348,6 +348,8 @@
+       "updated": "Tareas actualizadas"
+     },
+     "new-badge": "Nuevo",
++    "duplicate": "Duplicar",
++    "edited": "editado",
+     "parent-loading": "Cargando memorándum original…",
+     "parent-load-error": "No se pudo cargar el memorándum original.",
+     "parent-unavailable": "Memorándum original no disponible.",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Archivado correctamente",
+     "copied": "Copiado",
+     "deleted-successfully": "Eliminado correctamente",
++    "duplicated-successfully": "Nota duplicada correctamente",
+     "description-is-required": "La descripción es obligatoria",
+     "fill-all": "Por favor rellena todos los campos.",
+     "fill-all-required-fields": "Por favor rellena todos los campos obligatorios",
+diff --git a/web/src/locales/et.json b/web/src/locales/et.json
+index 48e1d3a..ab78fb5 100644
+--- a/web/src/locales/et.json
++++ b/web/src/locales/et.json
+@@ -386,6 +386,8 @@
+       "space-description": "Kõik ruumis {{space}}"
+     },
+     "new-badge": "Uus",
++    "duplicate": "Dubleeri",
++    "edited": "muudetud",
+     "parent-loading": "Algse memo laadimine…",
+     "parent-load-error": "Algse memo laadimine ebaõnnestus.",
+     "parent-unavailable": "Algne memo pole saadaval",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Arhiveerimine õnnestus",
+     "copied": "Kopeeritud",
+     "deleted-successfully": "Memo kustutamine õnnestus",
++    "duplicated-successfully": "Memo dubleeriti edukalt",
+     "description-is-required": "Kirjeldus on nõutav",
+     "fill-all": "Palun täitke kõik väljad.",
+     "fill-all-required-fields": "Palun täitke kõik nõutud väljad",
+diff --git a/web/src/locales/fa.json b/web/src/locales/fa.json
+index a0c08af..ad5a132 100644
+--- a/web/src/locales/fa.json
++++ b/web/src/locales/fa.json
+@@ -335,6 +335,8 @@
+       "open-image": "اشتراک‌گذاری به عنوان تصویر"
+     },
+     "new-badge": "جدید",
++    "duplicate": "تکثیر",
++    "edited": "ویرایش شده",
+     "parent-loading": "در حال بارگیری یادداشت اصلی...",
+     "parent-load-error": "یادداشت اصلی بارگیری نشد.",
+     "parent-unavailable": "یادداشت اصلی در دسترس نیست",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "با موفقیت آرشیو شد",
+     "copied": "کپی شد",
+     "deleted-successfully": "با موفقیت حذف شد",
++    "duplicated-successfully": "یادداشت با موفقیت تکثیر شد",
+     "description-is-required": "توضیحات اجباری است",
+     "fill-all": "لطفاً همه فیلدها را پر کنید.",
+     "fill-all-required-fields": "لطفا همه فیلدهای ضروری را پر کنید",
+diff --git a/web/src/locales/fi.json b/web/src/locales/fi.json
+index 11ba57e..77c396e 100644
+--- a/web/src/locales/fi.json
++++ b/web/src/locales/fi.json
+@@ -386,6 +386,8 @@
+       "space-description": "Kaikki tilassa {{space}}"
+     },
+     "new-badge": "Uusi",
++    "duplicate": "Monista",
++    "edited": "muokattu",
+     "parent-loading": "Ladataan alkuperäistä muistiota…",
+     "parent-load-error": "Alkuperäistä muistiota ei voitu ladata.",
+     "parent-unavailable": "Alkuperäinen muistio ei ole käytettävissä",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Arkistointi onnistui",
+     "copied": "Kopioitu",
+     "deleted-successfully": "Muistio poistettiin onnistuneesti",
++    "duplicated-successfully": "Muistio monistettiin onnistuneesti",
+     "description-is-required": "Kuvaus vaaditaan",
+     "fill-all": "Täytä kaikki kentät.",
+     "fill-all-required-fields": "Täytä kaikki vaaditut kentät",
+diff --git a/web/src/locales/fr.json b/web/src/locales/fr.json
+index 4805fa0..47c3d9b 100644
+--- a/web/src/locales/fr.json
++++ b/web/src/locales/fr.json
+@@ -348,6 +348,8 @@
+       "updated": "Tâches mises à jour"
+     },
+     "new-badge": "Nouveau",
++    "duplicate": "Dupliquer",
++    "edited": "modifié",
+     "parent-loading": "Chargement du mémo original…",
+     "parent-load-error": "Impossible de charger le mémo original.",
+     "parent-unavailable": "Mémo original indisponible.",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Archivé avec succès",
+     "copied": "Copié",
+     "deleted-successfully": "Supprimé avec succès",
++    "duplicated-successfully": "Mémo dupliqué avec succès",
+     "description-is-required": "La description est requise",
+     "fill-all": "Veuillez remplir tous les champs.",
+     "fill-all-required-fields": "Veuillez remplir tous les champs obligatoires",
+diff --git a/web/src/locales/gl.json b/web/src/locales/gl.json
+index 11a32ad..0901e1d 100644
+--- a/web/src/locales/gl.json
++++ b/web/src/locales/gl.json
+@@ -348,6 +348,8 @@
+       "updated": "Tarefas actualizadas"
+     },
+     "new-badge": "Novidade",
++    "duplicate": "Duplicar",
++    "edited": "editado",
+     "parent-loading": "Cargando a nota orixinal…",
+     "parent-load-error": "Non se puido cargar a nota orixinal.",
+     "parent-unavailable": "Nota orixinal non dispoñible",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Arquivada correctamente",
+     "copied": "Copiada",
+     "deleted-successfully": "Memo eliminada correctamente",
++    "duplicated-successfully": "Nota duplicada correctamente",
+     "description-is-required": "Requírese unha descrición",
+     "fill-all": "Completa todos os campos.",
+     "fill-all-required-fields": "Por favor, completa todos os campos requeridos",
+diff --git a/web/src/locales/he.json b/web/src/locales/he.json
+index 8ba185a..8ffcf94 100644
+--- a/web/src/locales/he.json
++++ b/web/src/locales/he.json
+@@ -380,6 +380,8 @@
+     "link-preview": "תצוגה מקדימה של קישור",
+     "load-more": "טען עוד",
+     "new-badge": "חדש",
++    "duplicate": "שכפל",
++    "edited": "נערך",
+     "newest-first": "החדשים ביותר תחילה",
+     "oldest-first": "הישנים ביותר תחילה",
+     "order-by": "מיין לפי",
+@@ -442,6 +444,7 @@
+     "archived-successfully": "הועבר לארכיון בהצלחה",
+     "copied": "הועתק",
+     "deleted-successfully": "הפתק נמחק בהצלחה",
++    "duplicated-successfully": "הפתק שוכפל בהצלחה",
+     "description-is-required": "נדרש תיאור",
+     "fill-all": "מלאו את כל השדות.",
+     "fill-all-required-fields": "מלאו את כל השדות הנדרשים",
+diff --git a/web/src/locales/hi.json b/web/src/locales/hi.json
+index 2a17ca3..24dc6f2 100644
+--- a/web/src/locales/hi.json
++++ b/web/src/locales/hi.json
+@@ -335,6 +335,8 @@
+       "open-image": "इमेज के तौर पर शेयर करें"
+     },
+     "new-badge": "नया",
++    "duplicate": "डुप्लिकेट करें",
++    "edited": "संपादित",
+     "parent-loading": "ओरिजिनल मेमो लोड हो रहा है…",
+     "parent-load-error": "ओरिजिनल मेमो लोड नहीं हो सका.",
+     "parent-unavailable": "ओरिजिनल मेमो उपलब्ध नहीं है",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "सफलतापूर्वक संग्रहीत किया गया",
+     "copied": "कॉपी किया गया",
+     "deleted-successfully": "सफलतापूर्वक हटाया गया",
++    "duplicated-successfully": "मेमो सफलतापूर्वक डुप्लिकेट किया गया",
+     "description-is-required": "विवरण आवश्यक है",
+     "fill-all": "कृपया सभी फ़ील्ड भरें।",
+     "fill-all-required-fields": "कृपया सभी आवश्यक फ़ील्ड भरें",
+diff --git a/web/src/locales/hr.json b/web/src/locales/hr.json
+index 1b23a58..d990ec3 100644
+--- a/web/src/locales/hr.json
++++ b/web/src/locales/hr.json
+@@ -348,6 +348,8 @@
+       "updated": "Zadaci ažurirani"
+     },
+     "new-badge": "Novi",
++    "duplicate": "Dupliciraj",
++    "edited": "uređeno",
+     "parent-loading": "Učitavanje izvorne bilješke…",
+     "parent-load-error": "Nije moguće učitati izvornu bilješku.",
+     "parent-unavailable": "Izvorna bilješka nije dostupna",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Uspješno arhivirano",
+     "copied": "Kopirano",
+     "deleted-successfully": "Uspješno obrisano",
++    "duplicated-successfully": "Bilješka uspješno dupliciran",
+     "description-is-required": "Opis je obavezan",
+     "fill-all": "Molimo, popuni sva polja.",
+     "fill-all-required-fields": "Molimo, popuni sva obavezna polja",
+diff --git a/web/src/locales/hu.json b/web/src/locales/hu.json
+index 6214e4a..f5e1ceb 100644
+--- a/web/src/locales/hu.json
++++ b/web/src/locales/hu.json
+@@ -348,6 +348,8 @@
+       "updated": "Feladatok frissítve"
+     },
+     "new-badge": "Új",
++    "duplicate": "Duplikálás",
++    "edited": "szerkesztve",
+     "parent-loading": "Eredeti feljegyzés betöltése…",
+     "parent-load-error": "Az eredeti feljegyzés nem tölthető be.",
+     "parent-unavailable": "Az eredeti feljegyzés nem érhető el.",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Sikeres archiválás",
+     "copied": "Másolva",
+     "deleted-successfully": "Sikeres törlés",
++    "duplicated-successfully": "A jegyzet sikeresen duplikálva",
+     "description-is-required": "Leírás szükséges",
+     "fill-all": "Töltsd ki az összes mezőt.",
+     "fill-all-required-fields": "Töltsd ki az összes kötelező mezőt",
+diff --git a/web/src/locales/id.json b/web/src/locales/id.json
+index da990a3..6796fbf 100644
+--- a/web/src/locales/id.json
++++ b/web/src/locales/id.json
+@@ -335,6 +335,8 @@
+       "open-image": "Bagikan sebagai gambar"
+     },
+     "new-badge": "Baru",
++    "duplicate": "Duplikat",
++    "edited": "diedit",
+     "parent-loading": "Memuat memo asli…",
+     "parent-load-error": "Tidak dapat memuat memo asli.",
+     "parent-unavailable": "Memo asli tidak tersedia",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "Berhasil diarsipkan",
+     "copied": "Disalin",
+     "deleted-successfully": "Berhasil dihapus",
++    "duplicated-successfully": "Memo berhasil diduplikasi",
+     "description-is-required": "Deskripsi wajib diisi",
+     "fill-all": "Harap isi semua kolom.",
+     "fill-all-required-fields": "Harap isi semua kolom wajib",
+diff --git a/web/src/locales/it.json b/web/src/locales/it.json
+index 88c9e93..ef1cef8 100644
+--- a/web/src/locales/it.json
++++ b/web/src/locales/it.json
+@@ -348,6 +348,8 @@
+       "updated": "Attività aggiornate"
+     },
+     "new-badge": "Nuovo",
++    "duplicate": "Duplica",
++    "edited": "modificata",
+     "parent-loading": "Caricamento del memo originale in corso…",
+     "parent-load-error": "Impossibile caricare il memo originale.",
+     "parent-unavailable": "Memo originale non disponibile",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Archiviato con successo",
+     "copied": "Copiato",
+     "deleted-successfully": "Eliminato con successo",
++    "duplicated-successfully": "Nota duplicata con successo",
+     "description-is-required": "La descrizione è obbligatoria",
+     "fill-all": "Compila tutti i campi",
+     "fill-all-required-fields": "Compila tutti i campi obbligatori",
+diff --git a/web/src/locales/ja.json b/web/src/locales/ja.json
+index 60aa994..a973f10 100644
+--- a/web/src/locales/ja.json
++++ b/web/src/locales/ja.json
+@@ -357,6 +357,8 @@
+       "updated": "タスクが更新されました"
+     },
+     "new-badge": "新着",
++    "duplicate": "複製",
++    "edited": "編集済み",
+     "parent-loading": "元のメモを読み込んでいます…",
+     "parent-load-error": "元のメモを読み込めませんでした。",
+     "parent-unavailable": "元のメモが利用できません",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "アーカイブが完了しました",
+     "copied": "コピーしました！",
+     "deleted-successfully": "削除されました",
++    "duplicated-successfully": "メモを複製しました",
+     "description-is-required": "説明は必須です",
+     "fill-all": "すべての項目を入力してください。",
+     "fill-all-required-fields": "すべての必須項目を入力してください",
+diff --git a/web/src/locales/ka-GE.json b/web/src/locales/ka-GE.json
+index 791dd4a..b9e7051 100644
+--- a/web/src/locales/ka-GE.json
++++ b/web/src/locales/ka-GE.json
+@@ -348,6 +348,8 @@
+       "updated": "ამოცანები განახლებულია"
+     },
+     "new-badge": "ახალი",
++    "duplicate": "დუბლირება",
++    "edited": "რედაქტირებულია",
+     "parent-loading": "ორიგინალი მემორის ჩატვირთვა…",
+     "parent-load-error": "ორიგინალი მემორის ჩატვირთვა ვერ მოხერხდა.",
+     "parent-unavailable": "ორიგინალი მემორანდუმი მიუწვდომელია",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "წარმატებით დაარქივდა",
+     "copied": "კოპირებული",
+     "deleted-successfully": "წარმატებით წაიშალა",
++    "duplicated-successfully": "მემო წარმატებით დუბლირდა",
+     "description-is-required": "აღწერა აუცილებელია",
+     "fill-all": "გთხოვთ შეავსოთ ყველა ველი.",
+     "fill-all-required-fields": "გთხოვთ შეავსოთ ყველა აუცილებელი ველი",
+diff --git a/web/src/locales/ko.json b/web/src/locales/ko.json
+index d236fe8..331ebe5 100644
+--- a/web/src/locales/ko.json
++++ b/web/src/locales/ko.json
+@@ -335,6 +335,8 @@
+       "open-image": "이미지로 공유"
+     },
+     "new-badge": "신규",
++    "duplicate": "복제",
++    "edited": "편집됨",
+     "parent-loading": "원본 메모 불러오는 중…",
+     "parent-load-error": "원본 메모를 불러올 수 없습니다.",
+     "parent-unavailable": "원본 메모를 사용할 수 없습니다.",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "성공적으로 보관되었습니다",
+     "copied": "복사했습니다",
+     "deleted-successfully": "성공적으로 삭제되었습니다",
++    "duplicated-successfully": "메모가 복제되었습니다",
+     "description-is-required": "설명이 필요합니다",
+     "fill-all": "모든 칸을 채워 주세요.",
+     "fill-all-required-fields": "필수 항목을 모두 입력하세요",
+diff --git a/web/src/locales/lt.json b/web/src/locales/lt.json
+index 28a8977..252333d 100644
+--- a/web/src/locales/lt.json
++++ b/web/src/locales/lt.json
+@@ -386,6 +386,8 @@
+       "space-description": "Visi erdvėje {{space}}"
+     },
+     "new-badge": "Nauja",
++    "duplicate": "Dubliuoti",
++    "edited": "redaguota",
+     "parent-loading": "Įkeliamas originalus priminimas…",
+     "parent-load-error": "Nepavyko įkelti originalaus priminimo.",
+     "parent-unavailable": "Originalus priminimas nepasiekiamas",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Sėkmingai suarchyvuota",
+     "copied": "Nukopijuota",
+     "deleted-successfully": "Atmintinė sėkmingai ištrinta",
++    "duplicated-successfully": "Atmintinė sėkmingai dubliuota",
+     "description-is-required": "Būtinas aprašymas",
+     "fill-all": "Prašome užpildyti visus laukus.",
+     "fill-all-required-fields": "Užpildykite visus privalomus laukus",
+diff --git a/web/src/locales/lv.json b/web/src/locales/lv.json
+index c262163..278fcec 100644
+--- a/web/src/locales/lv.json
++++ b/web/src/locales/lv.json
+@@ -386,6 +386,8 @@
+       "space-description": "Visi telpā {{space}}"
+     },
+     "new-badge": "Jauns",
++    "duplicate": "Dublēt",
++    "edited": "rediģēts",
+     "parent-loading": "Notiek sākotnējās piezīmes ielāde…",
+     "parent-load-error": "Nevarēja ielādēt sākotnējo piezīmi.",
+     "parent-unavailable": "Sākotnējā piezīme nav pieejama",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Veiksmīgi arhivēts",
+     "copied": "Kopēts",
+     "deleted-successfully": "Piezīme veiksmīgi izdzēsta",
++    "duplicated-successfully": "Piezīme veiksmīgi dublēta",
+     "description-is-required": "Nepieciešams apraksts",
+     "fill-all": "Lūdzu, aizpildiet visus laukus.",
+     "fill-all-required-fields": "Lūdzu, aizpildiet visus nepieciešamos laukus",
+diff --git a/web/src/locales/mr.json b/web/src/locales/mr.json
+index 5150ed8..7a4d87e 100644
+--- a/web/src/locales/mr.json
++++ b/web/src/locales/mr.json
+@@ -335,6 +335,8 @@
+       "open-image": "प्रतिमा म्हणून शेअर करा"
+     },
+     "new-badge": "नविन",
++    "duplicate": "डुप्लिकेट करा",
++    "edited": "संपादित",
+     "parent-loading": "मूळ मेमो लोड होत आहे…",
+     "parent-load-error": "मूळ मेमो लोड होऊ शकला नाही.",
+     "parent-unavailable": "मूळ मेमो अनुपलब्ध",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "यशस्वीरित्या संग्रहित केले",
+     "copied": "प्रत बनवली",
+     "deleted-successfully": "यशस्वीरित्या हटवले",
++    "duplicated-successfully": "मेमो यशस्वीरित्या डुप्लिकेट केला",
+     "description-is-required": "वर्णन आवश्यक आहे",
+     "fill-all": "कृपया सर्व फील्ड भरा.",
+     "fill-all-required-fields": "कृपया सर्व आवश्यक फील्ड भरा",
+diff --git a/web/src/locales/nb.json b/web/src/locales/nb.json
+index f8f0c3d..5c81538 100644
+--- a/web/src/locales/nb.json
++++ b/web/src/locales/nb.json
+@@ -348,6 +348,8 @@
+       "updated": "Oppgaver oppdatert"
+     },
+     "new-badge": "Ny",
++    "duplicate": "Dupliser",
++    "edited": "redigert",
+     "parent-loading": "Laster inn originalt notat…",
+     "parent-load-error": "Kunne ikke laste inn det originale notatet.",
+     "parent-unavailable": "Originalt notat er ikke tilgjengelig",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Arkivering vellykket",
+     "copied": "Kopiert",
+     "deleted-successfully": "Sletting vellykket",
++    "duplicated-successfully": "Notatet ble duplisert",
+     "description-is-required": "Beskrivelse kreves",
+     "fill-all": "Vennligst fyll ut alle feltene.",
+     "fill-all-required-fields": "Vennligst fyll ut alle obligatoriske felter",
+diff --git a/web/src/locales/nl.json b/web/src/locales/nl.json
+index a4ecd2f..1272902 100644
+--- a/web/src/locales/nl.json
++++ b/web/src/locales/nl.json
+@@ -348,6 +348,8 @@
+       "updated": "Taken bijgewerkt"
+     },
+     "new-badge": "Nieuw",
++    "duplicate": "Dupliceren",
++    "edited": "bewerkt",
+     "parent-loading": "Originele memo laden…",
+     "parent-load-error": "De originele memo kon niet worden geladen.",
+     "parent-unavailable": "Originele memo niet beschikbaar",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Succesvol gearchiveerd",
+     "copied": "Gekopieerd",
+     "deleted-successfully": "Succesvol verwijderd",
++    "duplicated-successfully": "Notitie succesvol gedupliceerd",
+     "description-is-required": "Beschrijving is verplicht",
+     "fill-all": "Vul alsjeblieft alle velden in.",
+     "fill-all-required-fields": "Vul alle verplichte velden in",
+diff --git a/web/src/locales/nn.json b/web/src/locales/nn.json
+index 7d5adf0..0ce13fa 100644
+--- a/web/src/locales/nn.json
++++ b/web/src/locales/nn.json
+@@ -408,6 +408,8 @@
+     "load-more": "Last fleire",
+     "moved": "Notatet er flytt",
+     "new-badge": "Nytt",
++    "duplicate": "Dupliser",
++    "edited": "redigert",
+     "newest-first": "Nyaste fyrst",
+     "oldest-first": "Eldste fyrst",
+     "on-this-memo": "På dette notatet",
+@@ -468,6 +470,7 @@
+     "archived-successfully": "Arkivert",
+     "copied": "Kopiert",
+     "deleted-successfully": "Notatet er sletta",
++    "duplicated-successfully": "Notatet er duplisert",
+     "description-is-required": "Skildring er naudsynt",
+     "fill-all": "Fyll ut alle felta.",
+     "fill-all-required-fields": "Fyll ut alle naudsynte felt",
+diff --git a/web/src/locales/pl.json b/web/src/locales/pl.json
+index c7bb344..e62900f 100644
+--- a/web/src/locales/pl.json
++++ b/web/src/locales/pl.json
+@@ -300,6 +300,8 @@
+     "link-preview": "Podgląd linków",
+     "load-more": "Załaduj więcej",
+     "new-badge": "Nowe",
++    "duplicate": "Duplikuj",
++    "edited": "edytowano",
+     "order-by": "Sortuj według",
+     "share": {
+       "active-links": "Aktywne linki udostępniania",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Zarchiwizowano pomyślnie",
+     "copied": "Skopiowano",
+     "deleted-successfully": "Usunięto pomyślnie",
++    "duplicated-successfully": "Notatka została zduplikowana",
+     "description-is-required": "Opis jest wymagany",
+     "fill-all": "Proszę wypełnić wszystkie pola.",
+     "fill-all-required-fields": "Proszę wypełnić wszystkie wymagane pola",
+diff --git a/web/src/locales/pt-BR.json b/web/src/locales/pt-BR.json
+index ba5ff42..04cf5fa 100644
+--- a/web/src/locales/pt-BR.json
++++ b/web/src/locales/pt-BR.json
+@@ -335,6 +335,8 @@
+       "open-image": "Compartilhar como imagem"
+     },
+     "new-badge": "Novo",
++    "duplicate": "Duplicar",
++    "edited": "editado",
+     "parent-loading": "Carregando memorando original…",
+     "parent-load-error": "Não foi possível carregar o memorando original.",
+     "parent-unavailable": "Memorando original indisponível",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "Arquivado com êxito",
+     "copied": "Copiado",
+     "deleted-successfully": "Êxito na exclusão",
++    "duplicated-successfully": "Nota duplicada com êxito",
+     "description-is-required": "A descrição é necessária",
+     "fill-all": "Por favor, preencha todos os campos.",
+     "fill-all-required-fields": "Por favor, preencha todos os campos obrigatórios",
+diff --git a/web/src/locales/pt-PT.json b/web/src/locales/pt-PT.json
+index 311b297..d498369 100644
+--- a/web/src/locales/pt-PT.json
++++ b/web/src/locales/pt-PT.json
+@@ -348,6 +348,8 @@
+       "updated": "Tarefas atualizadas"
+     },
+     "new-badge": "Novo",
++    "duplicate": "Duplicar",
++    "edited": "editado",
+     "parent-loading": "A carregar memorando original…",
+     "parent-load-error": "Não foi possível carregar o memorando original.",
+     "parent-unavailable": "Memorando original indisponível",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Arquivado com sucesso",
+     "copied": "Copiado",
+     "deleted-successfully": "Eliminado com sucesso",
++    "duplicated-successfully": "Nota duplicada com sucesso",
+     "description-is-required": "A descrição é obrigatória",
+     "fill-all": "Por favor, preencha todos os campos.",
+     "fill-all-required-fields": "Por favor, preencha todos os campos obrigatórios",
+diff --git a/web/src/locales/ro.json b/web/src/locales/ro.json
+index d97c5d3..3bba462 100644
+--- a/web/src/locales/ro.json
++++ b/web/src/locales/ro.json
+@@ -386,6 +386,8 @@
+       "space-description": "Toți din {{space}}"
+     },
+     "new-badge": "Nou",
++    "duplicate": "Duplică",
++    "edited": "editat",
+     "parent-loading": "Se încarcă nota originală…",
+     "parent-load-error": "Nu s-a putut încărca nota originală.",
+     "parent-unavailable": "Nota originală nu este disponibilă",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Arhivat cu succes",
+     "copied": "Copiat",
+     "deleted-successfully": "Memo a fost șters cu succes",
++    "duplicated-successfully": "Memo-ul a fost duplicat cu succes",
+     "description-is-required": "Este necesară descrierea",
+     "fill-all": "Vă rugăm să completați toate câmpurile.",
+     "fill-all-required-fields": "Vă rugăm să completați toate câmpurile obligatorii",
+diff --git a/web/src/locales/ru.json b/web/src/locales/ru.json
+index 6faf72e..9f89b93 100644
+--- a/web/src/locales/ru.json
++++ b/web/src/locales/ru.json
+@@ -356,6 +356,8 @@
+     "layout-list": "Список",
+     "layout-list-description": "Один столбец шириной, удобной для чтения",
+     "new-badge": "Новое",
++    "duplicate": "Дублировать",
++    "edited": "изменено",
+     "view-options": "Параметры отображения",
+     "parent-loading": "Загрузка исходной заметки…",
+     "parent-load-error": "Не удалось загрузить исходную заметку.",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Перемещено в архив",
+     "copied": "Скопировано",
+     "deleted-successfully": "Успешное удаление",
++    "duplicated-successfully": "Заметка успешно продублирована",
+     "description-is-required": "Необходимо заполнить \"Описание\"",
+     "fill-all": "Пожалуйста, заполните все поля",
+     "fill-all-required-fields": "Пожалуйста, заполните все необходимые поля",
+diff --git a/web/src/locales/sk.json b/web/src/locales/sk.json
+index 1bdc443..70e672b 100644
+--- a/web/src/locales/sk.json
++++ b/web/src/locales/sk.json
+@@ -386,6 +386,8 @@
+       "space-description": "Všetci v {{space}}"
+     },
+     "new-badge": "Nové",
++    "duplicate": "Duplikovať",
++    "edited": "upravené",
+     "parent-loading": "Načítava sa pôvodná poznámka…",
+     "parent-load-error": "Nepodarilo sa načítať pôvodnú poznámku.",
+     "parent-unavailable": "Pôvodná poznámka nie je k dispozícii",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Úspešne archivované",
+     "copied": "Skopírované",
+     "deleted-successfully": "Poznámka bola úspešne odstránená",
++    "duplicated-successfully": "Poznámka bola úspešne duplikovaná",
+     "description-is-required": "Vyžaduje sa popis",
+     "fill-all": "Vyplňte všetky polia.",
+     "fill-all-required-fields": "Vyplňte všetky povinné polia",
+diff --git a/web/src/locales/sl.json b/web/src/locales/sl.json
+index d7a4988..dbdfa0a 100644
+--- a/web/src/locales/sl.json
++++ b/web/src/locales/sl.json
+@@ -348,6 +348,8 @@
+       "updated": "Naloge posodobljene"
+     },
+     "new-badge": "Novo",
++    "duplicate": "Podvoji",
++    "edited": "urejeno",
+     "parent-loading": "Nalaganje izvirnega zapiska ...",
+     "parent-load-error": "Izvirnega zapiska ni bilo mogoče naložiti.",
+     "parent-unavailable": "Izvirni zapisek ni na voljo",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Uspešno arhivirano",
+     "copied": "Skopirano",
+     "deleted-successfully": "Uspešno izbrisano",
++    "duplicated-successfully": "Beležka uspešno podvojena",
+     "description-is-required": "Potreben je opis.",
+     "fill-all": "Prosim izpolnite vsa polja.",
+     "fill-all-required-fields": "Prosim izpolnite vsa zahtevana polja.",
+diff --git a/web/src/locales/sr.json b/web/src/locales/sr.json
+index d2493ad..1b494e4 100644
+--- a/web/src/locales/sr.json
++++ b/web/src/locales/sr.json
+@@ -386,6 +386,8 @@
+       "space-description": "Сви у {{space}}"
+     },
+     "new-badge": "Ново",
++    "duplicate": "Дуплирај",
++    "edited": "уређено",
+     "parent-loading": "Учитавање оригиналне белешке…",
+     "parent-load-error": "Није могуће учитати оригиналну белешку.",
+     "parent-unavailable": "Оригинална белешка није доступна",
+@@ -409,6 +411,7 @@
+     "archived-successfully": "Архивирано је успешно",
+     "copied": "Копирано",
+     "deleted-successfully": "Белешка је успешно избрисана",
++    "duplicated-successfully": "Белешка је успешно дуплирана",
+     "description-is-required": "Опис је обавезан",
+     "fill-all": "Молимо попуните сва поља.",
+     "fill-all-required-fields": "Попуните сва обавезна поља",
+diff --git a/web/src/locales/sv.json b/web/src/locales/sv.json
+index 728238f..72dcdff 100644
+--- a/web/src/locales/sv.json
++++ b/web/src/locales/sv.json
+@@ -348,6 +348,8 @@
+       "updated": "Uppgifter uppdaterade"
+     },
+     "new-badge": "Ny",
++    "duplicate": "Duplicera",
++    "edited": "redigerad",
+     "parent-loading": "Laddar originalmemot…",
+     "parent-load-error": "Kunde inte läsa in originalmemot.",
+     "parent-unavailable": "Originalmemot är inte tillgängligt",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Arkiverad framgångsrikt",
+     "copied": "Kopierad",
+     "deleted-successfully": "Raderad framgångsrikt",
++    "duplicated-successfully": "Anteckningen duplicerades",
+     "description-is-required": "Beskrivning krävs",
+     "fill-all": "Var god fyll i alla fält.",
+     "fill-all-required-fields": "Var god fyll i alla obligatoriska fält",
+diff --git a/web/src/locales/th.json b/web/src/locales/th.json
+index ea0f7c7..3c11d66 100644
+--- a/web/src/locales/th.json
++++ b/web/src/locales/th.json
+@@ -335,6 +335,8 @@
+       "open-image": "แชร์เป็นรูปภาพ"
+     },
+     "new-badge": "ใหม่",
++    "duplicate": "ทำสำเนา",
++    "edited": "แก้ไขแล้ว",
+     "parent-loading": "กำลังโหลดบันทึกต้นฉบับ…",
+     "parent-load-error": "ไม่สามารถโหลดบันทึกต้นฉบับได้",
+     "parent-unavailable": "บันทึกต้นฉบับไม่พร้อมใช้งาน",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "เก็บถาวรเรียบร้อยแล้ว",
+     "copied": "คัดลอกแล้ว",
+     "deleted-successfully": "ลบเรียบร้อยแล้ว",
++    "duplicated-successfully": "คัดลอกบันทึกเรียบร้อยแล้ว",
+     "description-is-required": "ต้องระบุคำอธิบาย",
+     "fill-all": "กรุณากรอกข้อมูลให้ครบทุกช่อง",
+     "fill-all-required-fields": "กรุณากรอกข้อมูลที่จำเป็นให้ครบ",
+diff --git a/web/src/locales/tr.json b/web/src/locales/tr.json
+index e604cd2..e3c97c4 100644
+--- a/web/src/locales/tr.json
++++ b/web/src/locales/tr.json
+@@ -341,6 +341,8 @@
+     "link-preview": "Bağlantı önizlemesi",
+     "load-more": "Daha fazla yükle",
+     "new-badge": "Yeni",
++    "duplicate": "Çoğalt",
++    "edited": "düzenlendi",
+     "order-by": "Sıralama Ölçütü",
+     "parent-memo": "Üst not",
+     "share": {
+@@ -397,6 +399,7 @@
+     "archived-successfully": "Başarıyla arşivlendi",
+     "copied": "Kopyalandı",
+     "deleted-successfully": "Başarıyla silindi",
++    "duplicated-successfully": "Not başarıyla çoğaltıldı",
+     "description-is-required": "Açıklama gerekli",
+     "fill-all": "Lütfen tüm alanları doldurun.",
+     "fill-all-required-fields": "Lütfen tüm gerekli alanları doldurun",
+diff --git a/web/src/locales/uk.json b/web/src/locales/uk.json
+index 7a8aeb7..e7a8d77 100644
+--- a/web/src/locales/uk.json
++++ b/web/src/locales/uk.json
+@@ -348,6 +348,8 @@
+       "updated": "Завдання оновлено"
+     },
+     "new-badge": "Новий",
++    "duplicate": "Дублювати",
++    "edited": "змінено",
+     "parent-loading": "Завантаження оригінальної нотатки…",
+     "parent-load-error": "Не вдалося завантажити оригінальну нотатку.",
+     "parent-unavailable": "Оригінальна нотатка недоступна",
+@@ -371,6 +373,7 @@
+     "archived-successfully": "Архівовано успішно",
+     "copied": "Скопійовано",
+     "deleted-successfully": "Успішно видалено",
++    "duplicated-successfully": "Нотатку успішно продубльовано",
+     "description-is-required": "Опис є обов’язковим",
+     "fill-all": "Будь ласка, заповніть всі поля.",
+     "fill-all-required-fields": "Будь ласка, заповніть усі обов’язкові поля",
+diff --git a/web/src/locales/vi.json b/web/src/locales/vi.json
+index 2f57c8e..b95b1fa 100644
+--- a/web/src/locales/vi.json
++++ b/web/src/locales/vi.json
+@@ -335,6 +335,8 @@
+       "open-image": "Chia sẻ dưới dạng ảnh"
+     },
+     "new-badge": "Mới",
++    "duplicate": "Nhân bản",
++    "edited": "đã chỉnh sửa",
+     "parent-loading": "Đang tải bản ghi nhớ gốc…",
+     "parent-load-error": "Không thể tải bản ghi nhớ gốc.",
+     "parent-unavailable": "Bản ghi nhớ gốc không khả dụng",
+@@ -366,6 +368,7 @@
+     "archived-successfully": "Lưu trữ thành công",
+     "copied": "Đã sao chép",
+     "deleted-successfully": "Xóa thành công",
++    "duplicated-successfully": "Đã nhân bản ghi chú thành công",
+     "description-is-required": "Mô tả là bắt buộc",
+     "fill-all": "Vui lòng điền vào tất cả các trường.",
+     "fill-all-required-fields": "Vui lòng điền vào tất cả các trường bắt buộc",
+diff --git a/web/src/locales/zh-Hans.json b/web/src/locales/zh-Hans.json
+index bd8d054..6708163 100644
+--- a/web/src/locales/zh-Hans.json
++++ b/web/src/locales/zh-Hans.json
+@@ -336,6 +336,8 @@
+     "link-preview": "链接预览",
+     "load-more": "加载更多",
+     "new-badge": "新",
++    "duplicate": "创建副本",
++    "edited": "已编辑",
+     "newest-first": "最新优先",
+     "oldest-first": "最早优先",
+     "on-this-memo": "本条备忘录",
+@@ -397,6 +399,7 @@
+     "archived-successfully": "归档成功",
+     "copied": "已复制",
+     "deleted-successfully": "成功删除！",
++    "duplicated-successfully": "备忘录已成功创建副本",
+     "description-is-required": "请填写说明",
+     "fill-all": "请填写所有栏目。",
+     "fill-all-required-fields": "请填写所有必填项。",
+diff --git a/web/src/locales/zh-Hant.json b/web/src/locales/zh-Hant.json
+index f895494..8d422af 100644
+--- a/web/src/locales/zh-Hant.json
++++ b/web/src/locales/zh-Hant.json
+@@ -388,6 +388,8 @@
+     "link-preview": "連結預覽",
+     "load-more": "載入更多",
+     "new-badge": "新",
++    "duplicate": "建立副本",
++    "edited": "已編輯",
+     "newest-first": "最新優先",
+     "oldest-first": "最早優先",
+     "order-by": "排序",
+@@ -450,6 +452,7 @@
+     "archived-successfully": "封存成功",
+     "copied": "已複製",
+     "deleted-successfully": "刪除成功",
++    "duplicated-successfully": "備忘錄已成功建立副本",
+     "description-is-required": "說明必填",
+     "fill-all": "請填寫所有欄位。",
+     "fill-all-required-fields": "請填寫所有必填欄位",

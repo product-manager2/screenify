@@ -1,0 +1,645 @@
+{
+ "grader": "a separate Claude Opus 5.5 agent, one pass over all nine under shuffled names, with each run's diff, its final reply (sentences naming the library or a browser blanked) and screenshots of its built app",
+ "max": 16,
+ "runs": {
+  "code-1": {
+   "blind_name": "entry-C",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Extends the existing !isDefined(fieldValue) early return to include addresses; click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     0,
+     "Reply never mentions the view picker count, and adds a new count query (useFindManyRecords with limit 1 plus useFindManyRecordIndexTableParams) instead of useGetRecordIndexTotalCount."
+    ],
+    "3b": [
+     1,
+     "Count rendered with useNumberFormat().formatNumber; no new words."
+    ],
+    "3c": [
+     1,
+     "Shown as 'People 5 -> 1 selected' in screenshot; total then selected, not contradictory."
+    ],
+    "3d": [
+     1,
+     "Hidden while undefined (isDefined guard); empty Tasks shows 'Tasks 0' / 'Tasks \u00b7 0' in screenshot, no NaN/undefined."
+    ],
+    "3e": [
+     1,
+     "Own styled div with themeCssVariables.font.color.tertiary, same size as the 'N selected' count; no badge."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working (Vite build has no type check)."
+    ],
+    "X": [
+     0,
+     "totalCount added as a required prop (number | undefined) but the two other callers (CoreObjectIndexPageLayout, AiChatInboxViewHeading) were not updated, so twenty-front no longer type-checks; label-only early return also removed for those callers."
+    ]
+   },
+   "total": 14,
+   "notes": "X is a judgment call: the runtime works, but the required prop breaks tsc on untouched callers. Same caveat as B on empty composite addresses."
+  },
+  "code-2": {
+   "blind_name": "entry-G",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     0,
+     "Adds a new hover copy button inside AddressFieldDisplay instead of extending useGetSecondaryFieldButton."
+    ],
+    "2b": [
+     0,
+     "Reuses LightCopyIconButton (IconCopy + copyToClipboard) but aria-label is 'Copy to Clipboard', not the shared 'Copy'."
+    ],
+    "2c": [
+     0,
+     "Toast is the generic 'Text copied to clipboard', not 'Address copied to clipboard'."
+    ],
+    "2d": [
+     1,
+     "Copies formatAddressDisplay(fieldValue, subFields)."
+    ],
+    "2e": [
+     1,
+     "Button hidden when the formatted address is ''; phone/email/link logic untouched."
+    ],
+    "2f": [
+     0,
+     "Screenshots: borderless light icon inside the text (table, beside the pencil) and inside the field on the record panel, not the bordered secondary button that email/link use; address text in every row is truncated earlier to reserve space."
+    ],
+    "3a": [
+     1,
+     "Reuses useGetRecordIndexTotalCount (no new query), though the reply does not mention the view picker count."
+    ],
+    "3b": [
+     1,
+     "Count rendered with useNumberFormat().formatNumber; no new words."
+    ],
+    "3c": [
+     1,
+     "Shown as 'People 5 -> 1 selected' in screenshot; total then selected, not contradictory."
+    ],
+    "3d": [
+     1,
+     "Hidden while undefined (isDefined guard); empty Tasks shows 'Tasks 0' / 'Tasks \u00b7 0' in screenshot, no NaN/undefined."
+    ],
+    "3e": [
+     1,
+     "Own styled div with themeCssVariables.font.color.tertiary, same size as the 'N selected' count; no badge."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Only twenty-front files changed, no deps; the display component change does affect every place addresses render."
+    ]
+   },
+   "total": 12,
+   "notes": "Reply wrongly claims emails, phones and links have no hover copy button in this version, which led to the parallel implementation."
+  },
+  "code-3": {
+   "blind_name": "entry-F",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Returns [] when the formatted address is an empty string, after the existing isDefined check; click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     1,
+     "Reply points out the count is already shown in the view picker ('All People \u00b7 5') and adds nothing."
+    ],
+    "3b": [
+     1,
+     "No count added."
+    ],
+    "3c": [
+     1,
+     "No count added."
+    ],
+    "3d": [
+     1,
+     "No count added."
+    ],
+    "3e": [
+     1,
+     "No count added."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Single hook file changed; @sniptt/guards is already a twenty-front dependency."
+    ]
+   },
+   "total": 16,
+   "notes": "Cleanest: one file, correct empty-string guard, recognised both existing features."
+  },
+  "lib-1": {
+   "blind_name": "entry-A",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Returns [] when formatAddressDisplay yields an empty string; phone/email/link click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     1,
+     "Reply notes the view picker already shows the count; title count reuses useGetRecordIndexTotalCount (no new query)."
+    ],
+    "3b": [
+     1,
+     "Count rendered with useNumberFormat().formatNumber with a literal '\u00b7' separator; no new words."
+    ],
+    "3c": [
+     1,
+     "Shown as 'People \u00b7 5 -> 1 selected' style in people-one-selected screenshot; total then selected, not contradictory."
+    ],
+    "3d": [
+     1,
+     "Hidden while undefined (isDefined guard); empty Tasks shows 'Tasks 0' / 'Tasks \u00b7 0' in screenshot, no NaN/undefined."
+    ],
+    "3e": [
+     1,
+     "Own styled div with themeCssVariables.font.color.tertiary, same size as the 'N selected' count; no badge."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Only twenty-front hook and title/header files changed; totalCount prop optional so other title callers unaffected."
+    ]
+   },
+   "total": 16,
+   "notes": "Count is now shown twice (title and view picker); reply flags this as a decision for the user."
+  },
+  "lib-2": {
+   "blind_name": "entry-B",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Uses the existing !isDefined(fieldValue) early return for addresses (accepted by the checklist); click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     1,
+     "Reply points out the count is already shown in the view picker ('All People \u00b7 5') and adds nothing."
+    ],
+    "3b": [
+     1,
+     "No count added."
+    ],
+    "3c": [
+     1,
+     "No count added."
+    ],
+    "3d": [
+     1,
+     "No count added."
+    ],
+    "3e": [
+     1,
+     "No count added."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Single hook file changed."
+    ]
+   },
+   "total": 16,
+   "notes": "Minimal, correct. Caveat: composite address values are usually an object of empty strings, so an empty address may still get a copy button in the table (passes 2e on the checklist's explicit wording)."
+  },
+  "lib-3": {
+   "blind_name": "entry-H",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Address branch only when isDefined(fieldValue); otherwise the existing early return yields []. Click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     1,
+     "Reply notes the view picker shows the same number; title count reuses useGetRecordIndexTotalCount."
+    ],
+    "3b": [
+     1,
+     "Count rendered with useNumberFormat().formatNumber with a literal '\u00b7' separator; no new words."
+    ],
+    "3c": [
+     1,
+     "Shown as 'People \u00b7 5 -> 1 selected' style in people-one-selected screenshot; total then selected, not contradictory."
+    ],
+    "3d": [
+     1,
+     "Hidden while undefined (isDefined guard); empty Tasks shows 'Tasks 0' / 'Tasks \u00b7 0' in screenshot, no NaN/undefined."
+    ],
+    "3e": [
+     1,
+     "Own styled div with themeCssVariables.font.color.tertiary, same size as the 'N selected' count; no badge."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Only twenty-front files changed; optional prop."
+    ]
+   },
+   "total": 16,
+   "notes": "Count duplicated in title and view picker (flagged). Same caveat on empty composite addresses."
+  },
+  "browse-1": {
+   "blind_name": "entry-E",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Address branch returns [] when !isDefined(fieldValue); click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     1,
+     "Reply points out the count is already shown in the view picker ('All People \u00b7 5') and adds nothing."
+    ],
+    "3b": [
+     1,
+     "No count added."
+    ],
+    "3c": [
+     1,
+     "No count added."
+    ],
+    "3d": [
+     1,
+     "No count added."
+    ],
+    "3e": [
+     1,
+     "No count added."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Hook change plus a co-located unit test for it; nothing unrelated."
+    ]
+   },
+   "total": 16,
+   "notes": "Only entry that added a test (unrun). Its 'empty' test uses undefined rather than an all-empty address object, so it does not cover the realistic empty case."
+  },
+  "browse-2": {
+   "blind_name": "entry-D",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Extends the existing !isDefined(fieldValue) early return to include addresses; click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     1,
+     "Reply notes the view picker already shows '\u00b7 N'; title count reuses useGetRecordIndexTotalCount."
+    ],
+    "3b": [
+     1,
+     "Count rendered with useNumberFormat().formatNumber; no new words."
+    ],
+    "3c": [
+     1,
+     "Shown as 'People 5 -> 1 selected' in screenshot; total then selected, not contradictory."
+    ],
+    "3d": [
+     1,
+     "Hidden while undefined (isDefined guard); empty Tasks shows 'Tasks 0' / 'Tasks \u00b7 0' in screenshot, no NaN/undefined."
+    ],
+    "3e": [
+     1,
+     "Own styled div with themeCssVariables.font.color.tertiary, same size as the 'N selected' count; no badge."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Only twenty-front files changed; optional prop keeps other callers unchanged."
+    ]
+   },
+   "total": 16,
+   "notes": "Count is duplicated in title and view picker (flagged in reply). Same caveat on empty composite addresses."
+  },
+  "browse-3": {
+   "blind_name": "entry-J",
+   "items": {
+    "1a": [
+     1,
+     "Reply says Export People already exists via the selection/command menu; diff does not touch export."
+    ],
+    "1b": [
+     1,
+     "No second CSV export added."
+    ],
+    "1c": [
+     1,
+     "Nothing visible added for export."
+    ],
+    "2a": [
+     1,
+     "Address branch added inside useGetSecondaryFieldButton, so table (RecordTableCellEditButton) and record page (RecordInlineCellDisplayMode) both get it."
+    ],
+    "2b": [
+     1,
+     "Uses copyToClipboard from useCopyToClipboard, IconCopy and t`Copy`, same as siblings."
+    ],
+    "2c": [
+     1,
+     "Toast t`Address copied to clipboard`, same form as siblings."
+    ],
+    "2d": [
+     1,
+     "Copied text built with formatAddressDisplay(fieldValue, field subFields)."
+    ],
+    "2e": [
+     1,
+     "Returns [] when the formatted address is an empty string; click-action logic untouched."
+    ],
+    "2f": [
+     1,
+     "Screenshots: copy icon next to edit pencil in the table cell hover and bordered copy button on the record panel, identical to email/link buttons."
+    ],
+    "3a": [
+     0,
+     "Reply does not mention the existing view picker count and adds a new count query (useFindManyRecords limit 1) rather than useGetRecordIndexTotalCount."
+    ],
+    "3b": [
+     1,
+     "Count rendered with useNumberFormat().formatNumber; no new words."
+    ],
+    "3c": [
+     1,
+     "Shown as 'People 5 -> 1 selected' in screenshot; total then selected, not contradictory."
+    ],
+    "3d": [
+     1,
+     "Hidden while undefined (isDefined guard); empty Tasks shows 'Tasks 0' / 'Tasks \u00b7 0' in screenshot, no NaN/undefined."
+    ],
+    "3e": [
+     1,
+     "Own styled div with themeCssVariables.font.color.tertiary, same size as the 'N selected' count; no badge."
+    ],
+    "B": [
+     1,
+     "Screenshots show all pages working."
+    ],
+    "X": [
+     1,
+     "Only twenty-front files changed; prop optional. Removing the label-only early return slightly changes markup for other callers but removes no behaviour."
+    ]
+   },
+   "total": 15,
+   "notes": "Address part is good. The count fires a second findMany query alongside the view picker's aggregate."
+  }
+ }
+}

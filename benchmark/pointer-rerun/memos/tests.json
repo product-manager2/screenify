@@ -1,0 +1,176 @@
+{
+ "command": "vitest run in web/ of each run's checkout, one run at a time on an otherwise quiet machine",
+ "runs": {
+  "hk-code-1": {
+   "passed": 1568,
+   "failed": 53,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-code-2": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-code-3": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-new-1": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-new-2": {
+   "passed": 1607,
+   "failed": 9,
+   "failed_by_file": {
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-new-3": {
+   "passed": 1607,
+   "failed": 9,
+   "failed_by_file": {
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-old-1": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-old-2": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "hk-old-3": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet-browse-1": {
+   "passed": 1622,
+   "failed": 0,
+   "failed_by_file": {}
+  },
+  "sonnet-browse-2": {
+   "passed": 1622,
+   "failed": 1,
+   "failed_by_file": {
+    "tests/memo-action-navigation.test.tsx": 1
+   }
+  },
+  "sonnet-browse-3": {
+   "passed": 1566,
+   "failed": 53,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet-code-1": {
+   "passed": 1559,
+   "failed": 57,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 4,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet-code-2": {
+   "passed": 1557,
+   "failed": 59,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 6,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet-code-3": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet-lib-1": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet-lib-2": {
+   "passed": 1561,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "sonnet-lib-3": {
+   "passed": 1555,
+   "failed": 55,
+   "failed_by_file": {
+    "tests/i18n-locale-search.test.ts": 1,
+    "tests/locale-resources.test.ts": 45,
+    "tests/memo-action-menu.test.tsx": 2,
+    "tests/memo-action-navigation.test.tsx": 7
+   }
+  },
+  "unchanged": {
+   "passed": 1616,
+   "failed": 0,
+   "failed_by_file": {}
+  }
+ }
+}

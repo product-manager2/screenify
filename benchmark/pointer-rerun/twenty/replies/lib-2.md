@@ -1,0 +1,9 @@
+I changed one of the three: the address copy button. The other two already exist in the app, so I left them alone.
+
+1. **Export selected people to CSV (no change).** Selecting rows and running "Export People" from the Command Menu (⌘K, Selection section) already downloads only the selected rows as CSV. `useRecordIndexExportParameters.ts` applies the selection filter. It is not on the selection bar because the server seeds the export command unpinned (`standard-command-menu-item.constant.ts`). Pinning it is a server default or a per-user setting in the command menu editor, and the server is out of scope.
+
+2. **Copy an address (changed `packages/twenty-front/src/modules/object-record/record-field/ui/hooks/useGetSecondaryFieldButton.ts`).** Address fields now get a copy button on hover, copying the formatted address with an "Address copied to clipboard" toast. The table cell (`RecordTableCellEditButton.tsx`) and the company page inline cell (`RecordInlineCellDisplayMode.tsx`) both read this hook, so the companies list and company page both pick it up. There is no open-in-app action for addresses, so the copy button is the only secondary button.
+
+3. **Show how many records there are (no change).** The view picker trigger already shows the count next to the view name, e.g. "All People · 5" (`ViewPickerDropdown.tsx`, via `useGetRecordIndexTotalCount`). That is the same on Companies. It is blank only while the count is loading.
+
+I did not build, lint, typecheck or run tests, because Bash is disabled in this session. I added no tests, since there are no existing tests for this hook to extend. I did not touch translation catalogs or anything under `screenify-out/`; I only read the index and one sidecar there.

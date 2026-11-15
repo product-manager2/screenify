@@ -1,0 +1,10 @@
+All three requests are implemented in the web client, but I could not build, lint, or test them. Bash is disabled in this session and `node_modules` isn't installed, so everything was checked by reading only. The `CopyPlusIcon` import is the thing most likely to need a fix if `pnpm lint` complains.
+
+1. **Copy memo text: no change.** The ⋮ menu already has Copy → "Copy Content" (`web/src/components/MemoActionMenu/MemoActionMenu.tsx`, `hooks.ts`). It copies the raw markdown, and it is one menu level down rather than one click on the card. I left it alone because the request's core already exists. If you want it one click away, promoting that item to the top level of the menu is a small follow-up.
+
+2. **Duplicate:** `web/src/components/MemoActionMenu/hooks.ts` adds `handleDuplicateMemo`, which calls the existing `useCreateMemo` with the same content, visibility and space, then shows a success toast. `MemoActionMenu.tsx` adds a "Duplicate" item after Copy, and `web/src/locales/en.json` gets `memo.duplicate` and `message.duplicated-successfully`.
+   - Decisions: I pass `space` too, because a SPACE-visibility memo is rejected without one. Attachments, location and relations are not copied. The item is hidden for viewers and archived memos, following the menu's documented rules; that also means a signed-in non-owner can't duplicate a memo. Comments get the item as well.
+
+3. **"edited" label:** `web/src/components/MemoView/MemoViewContext.tsx` exposes `isEdited` (update time differs from create time), and `MemoHeader.tsx` shows a muted "· edited" after the time. It is hidden when the card already displays "Last updated at", to avoid saying the same thing twice. I checked the server: `update_time` only moves when an update explicitly includes it, so pinning or archiving does not mark a memo as edited. The en.json key is `memo.edited`; other locales fall back to English.
+
+Not run: `pnpm lint`, `pnpm test`, `pnpm build`. No Go or proto files changed, so no `buf generate` or migrations were needed.

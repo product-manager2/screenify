@@ -96,6 +96,15 @@ Side-by-side images use, per arm and screen, the run with the median score
 ([`redraw/side-by-side/`](redraw/side-by-side/)); all eighteen renders and their HTML are in
 [`redraw/renders/`](redraw/renders/) and [`redraw/pages/`](redraw/pages/).
 
+## Test 4: the new pointer, on a small and a large app
+
+After the library pointer moved to the top of `AGENTS.md` with clearer wording, Haiku runs were
+graded blind on three feature requests in Memos and in Twenty (a large CRM). With the new pointer
+every library run opened the index before editing (none did with the old one), but only one in six
+opened a screenshot. Memos was a tie (code only 47/51, old pointer 49/51, new pointer 48/51);
+on Twenty the library arm scored 48/48, browsing the app 47/48 at twice the cost, and code only
+42/48. Three runs per arm; details, caveats and every run in [`pointer-rerun/`](pointer-rerun/).
+
 ## Method
 
 - **App.** Memos v26.11.0 (MIT), started with
