@@ -117,10 +117,19 @@ Requirements: Node 20+, git, and Chrome or Edge (or Playwright's Chromium:
 
 - `screenify-out`: a symlink to the store (outside git, below).
 - One line in `.gitignore`: `screenify-out`.
-- One pointer line in `CLAUDE.md` and `AGENTS.md`, if those files exist.
+- One pointer line in `CLAUDE.md` and `AGENTS.md`, if those files exist, right under the first
+  heading: before changing a screen, open the nearest existing screens in `screenify-out/INDEX.md`.
+  An agent that is only told *where* the library is does not open it before editing (see
+  [Test 3](benchmark/README.md#test-3-build-on-it)), so the line says *when*. A pointer you have
+  moved stays where you put it.
+- The skill, at `.claude/skills/screenify/SKILL.md` (Claude Code) and
+  `.agents/skills/screenify/SKILL.md` (Codex), meant to be committed so every teammate's agent
+  sees it. Its description leads with using the library before changing a screen; building the
+  library comes second.
 
-Nothing else. `init` prints exactly what it changed and changes nothing on a second run.
-Outside your repo it installs the skill:
+Nothing else (`--no-skills` leaves out the skill files). `init` prints exactly what it changed and
+changes nothing on a second run. Outside your repo it installs the skill and the agents that build
+the library:
 
 | Tool | Files |
 | --- | --- |
